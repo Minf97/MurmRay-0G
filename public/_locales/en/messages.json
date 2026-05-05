@@ -1,0 +1,11 @@
+{
+  "extName": {
+    "message": "Murmray"
+  },
+  "extDescription": {
+    "message": "A WXT extension with basic internationalization support."
+  },
+  "helloWorld": {
+    "message": "Hello world!"
+  }
+}

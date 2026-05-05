@@ -1,0 +1,11 @@
+{
+  "extName": {
+    "message": "Murmray"
+  },
+  "extDescription": {
+    "message": "一个带有基础国际化支持的 WXT 扩展。"
+  },
+  "helloWorld": {
+    "message": "你好，世界！"
+  }
+}
