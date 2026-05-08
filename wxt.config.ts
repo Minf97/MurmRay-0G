@@ -13,9 +13,9 @@ export default defineConfig({
   dev: {
     server: {
       host: '0.0.0.0',
-      port: 3000,
+      port: 3003,
       strictPort: true,
-      origin: 'http://localhost:3000',
+      origin: 'http://localhost:3003',
     },
   },
   manifest: {

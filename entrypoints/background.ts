@@ -1,5 +1,24 @@
 import { browser } from 'wxt/browser';
-import { CORE_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, CORE_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { invokePolymarketAnalysis } from '../src/background/api';
+import { buildPageContext } from '../src/shared/analysis';
+import type { Browser } from 'wxt/browser';
+
+type RuntimeMessage = {
+  type: string;
+  pageContext?: unknown;
+};
+
+type RuntimeSender = Browser.runtime.MessageSender;
+type RuntimeResponse = (response?: unknown) => void;
+
+// 判定消息
+function isRuntimeMessage(message: unknown): message is RuntimeMessage {
+  return Boolean(message)
+    && typeof message === 'object'
+    && 'type' in message!
+    && typeof (message as { type?: unknown }).type === 'string';
+}
 
 // 绑定面板
 async function applySidePanelBehavior() {
@@ -15,24 +34,39 @@ async function applySidePanelBehavior() {
 }
 
 // 处理消息
-function handleRuntimeMessage(message: unknown, _sender: unknown, sendResponse: (value?: unknown) => void) {
-  if (!message || typeof message !== 'object') return undefined;
+function handleRuntimeMessage(message: unknown, _sender: RuntimeSender, sendResponse: RuntimeResponse) {
+  if (!isRuntimeMessage(message)) {
+    return false;
+  }
 
-  if ('type' in message && message.type === CORE_MESSAGE_TYPES.ping) {
+  if (message.type === CORE_MESSAGE_TYPES.ping) {
     sendResponse(createCorePong());
-    return true;
+    return false;
   }
 
   if (
-    'type' in message &&
-    (message.type === CORE_MESSAGE_TYPES.contentReady
-      || message.type === CORE_MESSAGE_TYPES.sidepanelReady)
+    message.type === CORE_MESSAGE_TYPES.contentReady
+    || message.type === CORE_MESSAGE_TYPES.sidepanelReady
   ) {
     sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message.type === ANALYSIS_MESSAGE_TYPES.analyzePage) {
+    void (async () => {
+      try {
+        const pageContext = buildPageContext((message as { pageContext?: unknown }).pageContext);
+        const result = await invokePolymarketAnalysis(pageContext);
+        sendResponse({ ok: true, result });
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error || '分析失败');
+        sendResponse({ ok: false, error: text });
+      }
+    })();
     return true;
   }
 
-  return undefined;
+  return false;
 }
 
 export default defineBackground(() => {
