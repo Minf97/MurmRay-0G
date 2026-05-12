@@ -8,7 +8,7 @@ import {
   shouldSkipPage,
   SIDE_PANEL_TABS,
   summarizeAnalysis,
-} from '../../entrypoints/sidepanel/view-model.ts';
+} from '../../entrypoints/sidepanel/view-model';
 
 test('sidepanel tabs keep migrated order', () => {
   assert.deepEqual(SIDE_PANEL_TABS.map((tab) => tab.key), ['feed', 'profile', 'settings']);

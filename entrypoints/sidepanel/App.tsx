@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
-import { ANALYSIS_MESSAGE_TYPES, CORE_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
+import type { GhostStatePayload } from '../../src/background/ghost-mode';
 import {
   getDirectionMeta,
   getScoreTier,
@@ -16,6 +17,7 @@ import {
 } from './view-model';
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
+type ActiveTabInfo = { id: number; title: string };
 
 const STATUS_COPY: Record<ChannelStatus, string> = {
   checking: '检测中',
@@ -68,6 +70,29 @@ async function readActivePageContext(): Promise<PageContext> {
   }
 
   return response.pageContext as PageContext;
+}
+
+// 当前标签
+async function readActiveTabInfo(): Promise<ActiveTabInfo | null> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (!Number.isFinite(tab?.id)) return null;
+  return {
+    id: Number(tab.id),
+    title: typeof tab.title === 'string' ? tab.title : '',
+  };
+}
+
+// 映射状态
+function mapGhostStatus(status: string): AnalysisStatus {
+  if (status === 'analyzing') return 'loading';
+  if (status === 'opportunity' || status === 'no_opportunity') return 'ready';
+  if (status === 'blocked') return 'blocked';
+  if (status === 'error') return 'error';
+  return 'idle';
 }
 
 // 语义色值
@@ -304,6 +329,7 @@ function ResultBoard({
 function FeedView({
   channelStatus,
   analysisStatus,
+  ghostEnabled,
   result,
   error,
   lastTitle,
@@ -311,6 +337,7 @@ function FeedView({
 }: {
   channelStatus: ChannelStatus;
   analysisStatus: AnalysisStatus;
+  ghostEnabled: boolean;
   result: AnalysisResult | null;
   error: string;
   lastTitle: string;
@@ -337,6 +364,7 @@ function FeedView({
       <div className="status-strip" aria-label="运行状态">
         <StatusPill label={STATUS_COPY[channelStatus]} tone={statusTone(channelStatus)} />
         <StatusPill label={ANALYSIS_COPY[analysisStatus]} tone={statusTone(analysisStatus)} />
+        <StatusPill label={ghostEnabled ? '幽灵模式开' : '幽灵模式关'} tone={ghostEnabled ? 'success' : 'neutral'} />
         <span className="status-summary">{summarizeAnalysis(result)}</span>
       </div>
 
@@ -366,16 +394,29 @@ function ProfileView() {
 }
 
 // 设置视图
-function SettingsView() {
+function SettingsView({
+  ghostEnabled,
+  ghostBusy,
+  onToggleGhost,
+}: {
+  ghostEnabled: boolean;
+  ghostBusy: boolean;
+  onToggleGhost: (enabled: boolean) => void;
+}) {
   return (
     <section id="view-settings" className="view" role="tabpanel" aria-labelledby="tab-settings">
       <div className="setting-row">
         <div className="setting-label-group">
           <span className="setting-label-text">幽灵模式</span>
-          <span className="badge">待迁移</span>
+          <span className="badge">{ghostEnabled ? '已开启' : '已关闭'}</span>
         </div>
         <label className="ghost-mode-toggle" aria-label="幽灵模式">
-          <input type="checkbox" disabled />
+          <input
+            type="checkbox"
+            checked={ghostEnabled}
+            disabled={ghostBusy}
+            onChange={(event) => onToggleGhost(event.currentTarget.checked)}
+          />
           <span className="ghost-mode-track" aria-hidden="true">
             <span className="ghost-mode-thumb" />
           </span>
@@ -393,6 +434,46 @@ export function App() {
   const [analysisError, setAnalysisError] = useState('');
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [lastTitle, setLastTitle] = useState('');
+  const [activeTabId, setActiveTabId] = useState<number | null>(null);
+  const activeTabIdRef = useRef<number | null>(null);
+  const [ghostEnabled, setGhostEnabled] = useState(false);
+  const [ghostBusy, setGhostBusy] = useState(false);
+
+  // 应用幽灵态
+  function applyGhostPayload(payload: GhostStatePayload | null | undefined) {
+    if (!payload) return;
+
+    setLastTitle(payload.pageTitle || payload.pageUrl || '');
+    setAnalysisStatus(mapGhostStatus(payload.status));
+    setAnalysisError(payload.error || '');
+    setAnalysisResult({
+      totalMarkets: payload.totalMarkets,
+      matches: payload.matches,
+    });
+  }
+
+  // 读取幽灵态
+  async function refreshGhostStateForActiveTab() {
+    const tab = await readActiveTabInfo();
+    activeTabIdRef.current = tab?.id ?? null;
+    setActiveTabId(tab?.id ?? null);
+
+    if (!tab?.id) return;
+
+    const response = await browser.runtime.sendMessage({
+      type: GHOST_MESSAGE_TYPES.getTabState,
+      tabId: tab.id,
+    }).catch(() => null);
+
+    if (response?.ok && response.payload) {
+      applyGhostPayload(response.payload as GhostStatePayload);
+      return;
+    }
+
+    if (tab.title) {
+      setLastTitle(tab.title);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -408,8 +489,49 @@ export function App() {
       setChannelStatus(nextStatus);
     });
 
+    // 读取模式
+    void browser.runtime
+      .sendMessage({ type: GHOST_MESSAGE_TYPES.getState })
+      .then((response) => {
+        if (!alive) return;
+        setGhostEnabled(Boolean(response?.enabled));
+      })
+      .catch(() => undefined);
+
+    void refreshGhostStateForActiveTab();
+
+    // 监听幽灵态
+    const handleRuntimeMessage = (message: unknown) => {
+      if (!message || typeof message !== 'object') return false;
+      const typedMessage = message as { type?: unknown; enabled?: unknown; payload?: GhostStatePayload };
+
+      if (typedMessage.type === GHOST_MESSAGE_TYPES.modeChanged) {
+        setGhostEnabled(Boolean(typedMessage.enabled));
+        return false;
+      }
+
+      if (typedMessage.type === GHOST_MESSAGE_TYPES.stateUpdated && typedMessage.payload) {
+        const incomingTabId = Number(typedMessage.payload.tabId);
+        const currentTabId = activeTabIdRef.current;
+        if (!Number.isFinite(incomingTabId) || currentTabId === null || incomingTabId === currentTabId) {
+          applyGhostPayload(typedMessage.payload);
+        }
+      }
+
+      return false;
+    };
+    browser.runtime.onMessage.addListener(handleRuntimeMessage);
+
+    // 监听切页
+    const handleTabActivated = () => {
+      void refreshGhostStateForActiveTab();
+    };
+    browser.tabs.onActivated.addListener(handleTabActivated);
+
     return () => {
       alive = false;
+      browser.runtime.onMessage.removeListener(handleRuntimeMessage);
+      browser.tabs.onActivated.removeListener(handleTabActivated);
     };
   }, []);
 
@@ -420,7 +542,10 @@ export function App() {
     setAnalysisError('');
 
     try {
+      const tab = await readActiveTabInfo();
       const pageContext = await readActivePageContext();
+      activeTabIdRef.current = tab?.id ?? null;
+      setActiveTabId(tab?.id ?? null);
       setLastTitle(pageContext.title);
 
       if (shouldSkipPage(pageContext)) {
@@ -431,6 +556,7 @@ export function App() {
 
       const response = await browser.runtime.sendMessage({
         type: ANALYSIS_MESSAGE_TYPES.analyzePage,
+        tabId: tab?.id,
         pageContext,
       });
 
@@ -445,6 +571,40 @@ export function App() {
       setAnalysisError(message);
       setAnalysisResult(null);
       setAnalysisStatus('error');
+    }
+  }
+
+  // 切换幽灵
+  async function handleGhostToggle(enabled: boolean) {
+    setGhostBusy(true);
+    setGhostEnabled(enabled);
+
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: GHOST_MESSAGE_TYPES.setState,
+        enabled,
+      });
+
+      if (!response?.ok) {
+        throw new Error(response?.error || '切换幽灵模式失败');
+      }
+
+      setGhostEnabled(Boolean(response.enabled));
+      if (response.enabled) {
+        await refreshGhostStateForActiveTab();
+      } else {
+        setAnalysisStatus('idle');
+        setAnalysisResult(null);
+        setAnalysisError('');
+      }
+    } catch (error) {
+      const response = await browser.runtime
+        .sendMessage({ type: GHOST_MESSAGE_TYPES.getState })
+        .catch(() => null);
+      setGhostEnabled(Boolean(response?.enabled));
+      setAnalysisError(error instanceof Error ? error.message : String(error || '切换失败'));
+    } finally {
+      setGhostBusy(false);
     }
   }
 
@@ -467,6 +627,7 @@ export function App() {
           <FeedView
             channelStatus={channelStatus}
             analysisStatus={analysisStatus}
+            ghostEnabled={ghostEnabled}
             result={analysisResult}
             error={analysisError}
             lastTitle={lastTitle}
@@ -477,7 +638,11 @@ export function App() {
           <ProfileView />
         </div>
         <div hidden={activeTab !== 'settings'}>
-          <SettingsView />
+          <SettingsView
+            ghostEnabled={ghostEnabled}
+            ghostBusy={ghostBusy}
+            onToggleGhost={handleGhostToggle}
+          />
         </div>
       </div>
     </main>

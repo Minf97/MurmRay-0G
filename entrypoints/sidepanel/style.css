@@ -637,7 +637,7 @@ svg {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  cursor: not-allowed;
+  cursor: pointer;
 }
 
 .ghost-mode-toggle input {
@@ -654,6 +654,7 @@ svg {
   height: 20px;
   border-radius: 999px;
   background: var(--rule-strong);
+  transition: background-color 160ms ease;
 }
 
 .ghost-mode-thumb {
@@ -665,6 +666,19 @@ svg {
   border-radius: 999px;
   background: var(--paper);
   box-shadow: 0 1px 2px rgb(17 24 39 / 18%);
+  transition: transform 160ms ease;
+}
+
+.ghost-mode-toggle input:checked + .ghost-mode-track {
+  background: var(--ink-1);
+}
+
+.ghost-mode-toggle input:checked + .ghost-mode-track .ghost-mode-thumb {
+  transform: translateX(14px);
+}
+
+.ghost-mode-toggle input:disabled + .ghost-mode-track {
+  opacity: 0.6;
 }
 
 @keyframes pulse {

@@ -4,7 +4,7 @@ import {
   type AnalysisMatch,
   type AnalysisResult,
   type PageContext,
-} from '../../src/shared/analysis.ts';
+} from '../../src/shared/analysis';
 
 export const SIDE_PANEL_TABS = [
   { key: 'feed', label: '信号' },

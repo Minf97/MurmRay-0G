@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { invokePolymarketAnalysis } from '../../src/background/api.ts';
-import { ANALYSIS_FUNCTION_NAME, INSFORGE_URL } from '../../src/shared/config.ts';
+import { invokePolymarketAnalysis } from '../../src/background/api';
+import { ANALYSIS_FUNCTION_NAME, INSFORGE_URL } from '../../src/shared/config';
 
 const SAMPLE_PAGE = {
   title: 'Sample page',

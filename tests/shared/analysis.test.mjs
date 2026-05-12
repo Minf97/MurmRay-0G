@@ -4,7 +4,7 @@ import {
   buildPageContext,
   isBlacklistedUrl,
   mergeMatches,
-} from '../../src/shared/analysis.ts';
+} from '../../src/shared/analysis';
 
 test('buildPageContext trims and validates input', () => {
   const context = buildPageContext({

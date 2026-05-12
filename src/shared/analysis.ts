@@ -1,4 +1,4 @@
-import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_TEXT_CHARS } from './config.ts';
+import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_TEXT_CHARS } from './config';
 
 // 截断文本
 export function clipText(text: unknown, maxLength: number) {

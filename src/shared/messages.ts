@@ -16,16 +16,29 @@ export const ANALYSIS_MESSAGE_TYPES = Object.freeze({
   analyzePage: 'analysis:analyze_page',
 } as const);
 
+// 幽灵消息
+export const GHOST_MESSAGE_TYPES = Object.freeze({
+  getState: 'ghost:get_state',
+  setState: 'ghost:set_state',
+  getTabState: 'ghost:get_tab_state',
+  analyzePage: 'ghost:analyze_page',
+  openSidepanel: 'ghost:open_sidepanel',
+  modeChanged: 'ghost:mode_changed',
+  stateUpdated: 'ghost:state_updated',
+} as const);
+
 export type CoreMessageType = typeof CORE_MESSAGE_TYPES[keyof typeof CORE_MESSAGE_TYPES];
 export type PageMessageType = typeof PAGE_MESSAGE_TYPES[keyof typeof PAGE_MESSAGE_TYPES];
 export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANALYSIS_MESSAGE_TYPES];
+export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
   ...Object.values(PAGE_MESSAGE_TYPES),
   ...Object.values(ANALYSIS_MESSAGE_TYPES),
+  ...Object.values(GHOST_MESSAGE_TYPES),
 ]);
 
 // 创建回包

@@ -4,8 +4,8 @@ import {
   ANALYSIS_TIMEOUT_MS,
   INSFORGE_ANON_KEY,
   INSFORGE_URL,
-} from '../shared/config.ts';
-import { normalizeAnalysisResult, type AnalysisResult, type PageContext } from '../shared/analysis.ts';
+} from '../shared/config';
+import { normalizeAnalysisResult, type AnalysisResult, type PageContext } from '../shared/analysis';
 
 // 建客户端
 function createInsforgeClient() {

@@ -6,7 +6,7 @@ import {
   EXTENSION_PERMISSIONS,
   MINIMUM_CHROME_VERSION,
   WEB_PAGE_MATCHES,
-} from '../../src/shared/manifest.ts';
+} from '../../src/shared/manifest';
 
 test('manifest constants expose baseline metadata', () => {
   assert.equal(EXTENSION_NAME, 'MURMRAY');

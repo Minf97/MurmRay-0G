@@ -4,10 +4,11 @@ import {
   ANALYSIS_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   createCorePong,
+  GHOST_MESSAGE_TYPES,
   isKnownMessageType,
   isCoreMessageType,
   PAGE_MESSAGE_TYPES,
-} from '../../src/shared/messages.ts';
+} from '../../src/shared/messages';
 
 test('message constants expose baseline channels', () => {
   assert.deepEqual(CORE_MESSAGE_TYPES, {
@@ -25,6 +26,16 @@ test('message constants expose app channels', () => {
 
   assert.deepEqual(ANALYSIS_MESSAGE_TYPES, {
     analyzePage: 'analysis:analyze_page',
+  });
+
+  assert.deepEqual(GHOST_MESSAGE_TYPES, {
+    getState: 'ghost:get_state',
+    setState: 'ghost:set_state',
+    getTabState: 'ghost:get_tab_state',
+    analyzePage: 'ghost:analyze_page',
+    openSidepanel: 'ghost:open_sidepanel',
+    modeChanged: 'ghost:mode_changed',
+    stateUpdated: 'ghost:state_updated',
   });
 });
 
@@ -44,5 +55,6 @@ test('isCoreMessageType validates known values', () => {
 test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(PAGE_MESSAGE_TYPES.extract), true);
   assert.equal(isKnownMessageType(ANALYSIS_MESSAGE_TYPES.analyzePage), true);
+  assert.equal(isKnownMessageType(GHOST_MESSAGE_TYPES.stateUpdated), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });
