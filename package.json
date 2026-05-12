@@ -11,8 +11,8 @@
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
-    "test": "node --test tests/project/*.test.mjs tests/shared/*.test.mjs tests/background/*.test.mjs tests/server/*.test.mjs",
-    "test:watch": "node --test --watch tests/project/*.test.mjs tests/shared/*.test.mjs tests/background/*.test.mjs tests/server/*.test.mjs",
+    "test": "node --test tests/project/*.test.mjs tests/shared/*.test.mjs tests/background/*.test.mjs tests/server/*.test.mjs tests/sidepanel/*.test.mjs",
+    "test:watch": "node --test --watch tests/project/*.test.mjs tests/shared/*.test.mjs tests/background/*.test.mjs tests/server/*.test.mjs tests/sidepanel/*.test.mjs",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "postinstall": "wxt prepare"
