@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
-import { ANALYSIS_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
+import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
 import {
   getDirectionMeta,
@@ -15,6 +16,7 @@ import {
   type AnalysisStatus,
   type SidePanelTab,
 } from './view-model';
+import { AuthLoading, AuthPanel, UserProfile, type AuthStatus } from './auth-panel';
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
 type ActiveTabInfo = { id: number; title: string };
@@ -374,20 +376,22 @@ function FeedView({
 }
 
 // 我的视图
-function ProfileView() {
+function ProfileView({
+  user,
+  logoutBusy,
+  onLogout,
+}: {
+  user: AuthUser;
+  logoutBusy: boolean;
+  onLogout: () => void;
+}) {
   return (
     <section id="view-profile" className="view" role="tabpanel" aria-labelledby="tab-profile">
-      <div className="profile-block">
-        <span className="profile-avatar" aria-hidden="true">M</span>
-        <div className="profile-copy">
-          <h2>访客</h2>
-          <p>登录与会员将在后续功能迁移。</p>
-        </div>
-      </div>
+      <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
 
       <div className="setting-row">
         <span className="setting-label-text">会员状态</span>
-        <span className="badge">未接入</span>
+        <span className="badge">待迁移</span>
       </div>
     </section>
   );
@@ -438,6 +442,10 @@ export function App() {
   const activeTabIdRef = useRef<number | null>(null);
   const [ghostEnabled, setGhostEnabled] = useState(false);
   const [ghostBusy, setGhostBusy] = useState(false);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authError, setAuthError] = useState('');
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   // 应用幽灵态
   function applyGhostPayload(payload: GhostStatePayload | null | undefined) {
@@ -475,6 +483,29 @@ export function App() {
     }
   }
 
+  // 应用用户态
+  function applyAuthUser(user: AuthUser | null) {
+    setAuthUser(user);
+    setAuthStatus(user ? 'signed_in' : 'signed_out');
+    if (user) setAuthError('');
+  }
+
+  // 读取用户态
+  async function refreshAuthUser() {
+    setAuthStatus('checking');
+
+    const response = await browser.runtime
+      .sendMessage({ type: AUTH_MESSAGE_TYPES.getUser })
+      .catch(() => null);
+
+    if (response?.ok && response.data?.user) {
+      applyAuthUser(response.data.user as AuthUser);
+      return;
+    }
+
+    applyAuthUser(null);
+  }
+
   useEffect(() => {
     let alive = true;
 
@@ -498,12 +529,18 @@ export function App() {
       })
       .catch(() => undefined);
 
+    void refreshAuthUser();
     void refreshGhostStateForActiveTab();
 
-    // 监听幽灵态
+    // 监听运行态
     const handleRuntimeMessage = (message: unknown) => {
       if (!message || typeof message !== 'object') return false;
-      const typedMessage = message as { type?: unknown; enabled?: unknown; payload?: GhostStatePayload };
+      const typedMessage = message as { type?: unknown; enabled?: unknown; payload?: GhostStatePayload; user?: AuthUser | null };
+
+      if (typedMessage.type === AUTH_MESSAGE_TYPES.stateChanged) {
+        applyAuthUser(typedMessage.user || null);
+        return false;
+      }
 
       if (typedMessage.type === GHOST_MESSAGE_TYPES.modeChanged) {
         setGhostEnabled(Boolean(typedMessage.enabled));
@@ -608,6 +645,57 @@ export function App() {
     }
   }
 
+  // 谷歌登录
+  async function handleGoogleLogin() {
+    setAuthStatus('checking');
+    setAuthError('');
+
+    const response = await browser.runtime
+      .sendMessage({ type: AUTH_MESSAGE_TYPES.googleSignIn })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (response?.ok && response.data?.user) {
+      applyAuthUser(response.data.user as AuthUser);
+      return;
+    }
+
+    setAuthStatus('signed_out');
+    setAuthError(response?.error || 'Google 登录失败');
+  }
+
+  // 退出登录
+  async function handleLogout() {
+    setLogoutBusy(true);
+
+    try {
+      const response = await browser.runtime.sendMessage({ type: AUTH_MESSAGE_TYPES.logout });
+      if (!response?.ok) {
+        throw new Error(response?.error || '退出登录失败');
+      }
+
+      applyAuthUser(null);
+      setActiveTab('feed');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error || '退出登录失败'));
+    } finally {
+      setLogoutBusy(false);
+    }
+  }
+
+  if (authStatus === 'checking' && !authUser) {
+    return <AuthLoading />;
+  }
+
+  if (!authUser) {
+    return (
+      <AuthPanel
+        status={authStatus}
+        error={authError}
+        onGoogleLogin={handleGoogleLogin}
+      />
+    );
+  }
+
   return (
     <main className="sidepanel-shell">
       <nav
@@ -635,7 +723,7 @@ export function App() {
           />
         </div>
         <div hidden={activeTab !== 'profile'}>
-          <ProfileView />
+          <ProfileView user={authUser} logoutBusy={logoutBusy} onLogout={handleLogout} />
         </div>
         <div hidden={activeTab !== 'settings'}>
           <SettingsView

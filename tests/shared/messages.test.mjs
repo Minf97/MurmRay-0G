@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ANALYSIS_MESSAGE_TYPES,
+  AUTH_MESSAGE_TYPES,
   CORE_MESSAGE_TYPES,
   createCorePong,
   GHOST_MESSAGE_TYPES,
@@ -37,6 +38,13 @@ test('message constants expose app channels', () => {
     modeChanged: 'ghost:mode_changed',
     stateUpdated: 'ghost:state_updated',
   });
+
+  assert.deepEqual(AUTH_MESSAGE_TYPES, {
+    getUser: 'auth:me',
+    googleSignIn: 'auth:google_sign_in',
+    logout: 'auth:logout',
+    stateChanged: 'auth:state_changed',
+  });
 });
 
 test('createCorePong returns pong payload', () => {
@@ -56,5 +64,6 @@ test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(PAGE_MESSAGE_TYPES.extract), true);
   assert.equal(isKnownMessageType(ANALYSIS_MESSAGE_TYPES.analyzePage), true);
   assert.equal(isKnownMessageType(GHOST_MESSAGE_TYPES.stateUpdated), true);
+  assert.equal(isKnownMessageType(AUTH_MESSAGE_TYPES.stateChanged), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });

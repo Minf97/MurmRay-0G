@@ -24,3 +24,12 @@ export const GHOST_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // 缓存数量
 export const GHOST_MAX_CACHE_ENTRIES = 80;
+
+// 访问令牌
+export const AUTH_TOKEN_STORAGE_KEY = 'murmray:auth_token';
+
+// 刷新令牌
+export const AUTH_REFRESH_TOKEN_STORAGE_KEY = 'murmray:auth_refresh_token';
+
+// 用户缓存
+export const AUTH_USER_STORAGE_KEY = 'murmray:auth_user';

@@ -27,18 +27,28 @@ export const GHOST_MESSAGE_TYPES = Object.freeze({
   stateUpdated: 'ghost:state_updated',
 } as const);
 
+// 认证消息
+export const AUTH_MESSAGE_TYPES = Object.freeze({
+  getUser: 'auth:me',
+  googleSignIn: 'auth:google_sign_in',
+  logout: 'auth:logout',
+  stateChanged: 'auth:state_changed',
+} as const);
+
 export type CoreMessageType = typeof CORE_MESSAGE_TYPES[keyof typeof CORE_MESSAGE_TYPES];
 export type PageMessageType = typeof PAGE_MESSAGE_TYPES[keyof typeof PAGE_MESSAGE_TYPES];
 export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANALYSIS_MESSAGE_TYPES];
 export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MESSAGE_TYPES];
+export type AuthMessageType = typeof AUTH_MESSAGE_TYPES[keyof typeof AUTH_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
   ...Object.values(PAGE_MESSAGE_TYPES),
   ...Object.values(ANALYSIS_MESSAGE_TYPES),
   ...Object.values(GHOST_MESSAGE_TYPES),
+  ...Object.values(AUTH_MESSAGE_TYPES),
 ]);
 
 // 创建回包

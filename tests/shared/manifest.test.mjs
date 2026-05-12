@@ -26,5 +26,6 @@ test('manifest constants keep required permissions', () => {
     'tabs',
     'scripting',
     'storage',
+    'identity',
   ]);
 });

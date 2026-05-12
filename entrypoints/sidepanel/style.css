@@ -221,6 +221,108 @@ svg {
   cursor: progress;
 }
 
+.btn-secondary {
+  border-color: var(--rule);
+  background: var(--paper);
+  color: var(--ink-2);
+}
+
+.btn-secondary:hover {
+  border-color: var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink-1);
+}
+
+.btn-secondary:disabled {
+  color: var(--ink-4);
+  cursor: progress;
+}
+
+.auth-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px 18px;
+}
+
+.auth-box {
+  width: min(100%, 320px);
+}
+
+.auth-eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.auth-box h1 {
+  margin: 0;
+  color: var(--ink-1);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.12;
+}
+
+.auth-subtitle {
+  margin: 12px 0 22px;
+  color: var(--ink-3);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.btn-google {
+  width: 100%;
+  min-height: 44px;
+  gap: 9px;
+  border-color: var(--rule);
+  background: var(--paper);
+  color: var(--ink-1);
+  box-shadow: 0 1px 2px rgb(17 24 39 / 8%);
+}
+
+.btn-google:hover {
+  background: var(--surface);
+}
+
+.btn-google:disabled {
+  color: var(--ink-4);
+  cursor: progress;
+}
+
+.google-mark,
+.google-mark svg {
+  width: 18px;
+  height: 18px;
+}
+
+.auth-error {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: var(--bad);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.auth-loading {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.auth-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--rule);
+  border-top-color: var(--ink-1);
+  border-radius: 999px;
+  animation: spin 800ms linear infinite;
+}
+
 .status-strip {
   display: flex;
   align-items: center;
@@ -691,6 +793,12 @@ svg {
   50% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

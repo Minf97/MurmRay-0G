@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
-import { ANALYSIS_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
 import { createGhostModeController } from '../src/background/ghost-mode';
+import { createAuthController } from '../src/background/auth';
 import type { Browser } from 'wxt/browser';
 
 type RuntimeMessage = {
@@ -42,6 +43,7 @@ function handleRuntimeMessage(
   sender: RuntimeSender,
   sendResponse: RuntimeResponse,
   ghostMode: ReturnType<typeof createGhostModeController>,
+  auth: ReturnType<typeof createAuthController>,
 ) {
   if (!isRuntimeMessage(message)) {
     return false;
@@ -135,11 +137,46 @@ function handleRuntimeMessage(
     return true;
   }
 
+  if (message.type === AUTH_MESSAGE_TYPES.googleSignIn) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await auth.signInWithGoogle() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === AUTH_MESSAGE_TYPES.logout) {
+    void (async () => {
+      try {
+        await auth.logout();
+        sendResponse({ ok: true });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === AUTH_MESSAGE_TYPES.getUser) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await auth.getUser() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   return false;
 }
 
 export default defineBackground(() => {
   const ghostMode = createGhostModeController({ browser });
+  const auth = createAuthController({ browser });
 
   // 初始化面板
   browser.runtime.onInstalled.addListener(() => {
@@ -155,7 +192,7 @@ export default defineBackground(() => {
 
   // 监听消息
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => (
-    handleRuntimeMessage(message, sender, sendResponse, ghostMode)
+    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth)
   ));
 
   // 清理标签

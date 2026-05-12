@@ -18,4 +18,5 @@ export const EXTENSION_PERMISSIONS = Object.freeze([
   'tabs',
   'scripting',
   'storage',
+  'identity',
 ]);
