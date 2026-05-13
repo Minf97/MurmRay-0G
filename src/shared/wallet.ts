@@ -27,6 +27,6 @@ export function normalizeWalletProviderKey(value: unknown): WalletProviderKey {
 // 缩短地址
 export function shortenWalletAddress(address: unknown) {
   const normalized = String(address || '').trim();
-  if (!/^0x[a-fA-F0-9]{40}$/.test(normalized)) return '';
+  if (!/^0x[a-f0-9]{40}$/i.test(normalized)) return '';
   return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
 }

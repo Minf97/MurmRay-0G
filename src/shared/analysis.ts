@@ -194,6 +194,11 @@ export interface AnalysisMatch {
   direction: string;
   reason: string;
   marketUrl: string | null;
+  isHeld?: boolean;
+  heldOutcomeLabel?: string;
+  heldCashPnl?: number;
+  heldCurrentValue?: number;
+  heldPositionCount?: number;
 }
 
 export interface AnalysisResult {

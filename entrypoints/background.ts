@@ -1,9 +1,10 @@
 import { browser } from 'wxt/browser';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, WALLET_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, WALLET_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
 import { createGhostModeController } from '../src/background/ghost-mode';
 import { createAuthController } from '../src/background/auth';
 import { createMembershipController } from '../src/background/membership';
 import { createWalletController } from '../src/background/wallet';
+import { createPolymarketPortfolioController } from '../src/background/portfolio';
 import type { Browser } from 'wxt/browser';
 
 type RuntimeMessage = {
@@ -15,6 +16,7 @@ type RuntimeMessage = {
   triggerSource?: unknown;
   force?: unknown;
   providerKey?: unknown;
+  address?: unknown;
 };
 
 type RuntimeSender = Browser.runtime.MessageSender;
@@ -50,6 +52,7 @@ function handleRuntimeMessage(
   auth: ReturnType<typeof createAuthController>,
   membership: ReturnType<typeof createMembershipController>,
   wallet: ReturnType<typeof createWalletController>,
+  portfolio: ReturnType<typeof createPolymarketPortfolioController>,
 ) {
   if (!isRuntimeMessage(message)) {
     return false;
@@ -232,6 +235,22 @@ function handleRuntimeMessage(
     return true;
   }
 
+  if (message.type === POLYMARKET_MESSAGE_TYPES.getPortfolio) {
+    void (async () => {
+      try {
+        const data = await portfolio.getPolymarketPortfolio({
+          address: message.address,
+          providerKey: message.providerKey,
+          force: Boolean(message.force),
+        });
+        sendResponse({ ok: true, data });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   return false;
 }
 
@@ -245,6 +264,9 @@ export default defineBackground(() => {
   // 免费策略
   const ghostMode = createGhostModeController({ browser });
   const wallet = createWalletController({ browser });
+  const portfolio = createPolymarketPortfolioController({
+    getWalletState: wallet.getWalletState,
+  });
 
   // 初始化面板
   browser.runtime.onInstalled.addListener(() => {
@@ -260,7 +282,7 @@ export default defineBackground(() => {
 
   // 监听消息
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => (
-    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth, membership, wallet)
+    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth, membership, wallet, portfolio)
   ));
 
   // 清理标签

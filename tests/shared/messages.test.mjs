@@ -7,6 +7,7 @@ import {
   createCorePong,
   GHOST_MESSAGE_TYPES,
   MEMBERSHIP_MESSAGE_TYPES,
+  POLYMARKET_MESSAGE_TYPES,
   WALLET_MESSAGE_TYPES,
   isKnownMessageType,
   isCoreMessageType,
@@ -58,6 +59,10 @@ test('message constants expose app channels', () => {
     connect: 'wallet:connect',
     switchXLayer: 'wallet:switch_xlayer',
   });
+
+  assert.deepEqual(POLYMARKET_MESSAGE_TYPES, {
+    getPortfolio: 'polymarket:get_portfolio',
+  });
 });
 
 test('createCorePong returns pong payload', () => {
@@ -80,5 +85,6 @@ test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(AUTH_MESSAGE_TYPES.stateChanged), true);
   assert.equal(isKnownMessageType(MEMBERSHIP_MESSAGE_TYPES.getStatus), true);
   assert.equal(isKnownMessageType(WALLET_MESSAGE_TYPES.switchXLayer), true);
+  assert.equal(isKnownMessageType(POLYMARKET_MESSAGE_TYPES.getPortfolio), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });

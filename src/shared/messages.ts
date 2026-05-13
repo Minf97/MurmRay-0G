@@ -48,6 +48,11 @@ export const WALLET_MESSAGE_TYPES = Object.freeze({
   switchXLayer: 'wallet:switch_xlayer',
 } as const);
 
+// 持仓消息
+export const POLYMARKET_MESSAGE_TYPES = Object.freeze({
+  getPortfolio: 'polymarket:get_portfolio',
+} as const);
+
 export type CoreMessageType = typeof CORE_MESSAGE_TYPES[keyof typeof CORE_MESSAGE_TYPES];
 export type PageMessageType = typeof PAGE_MESSAGE_TYPES[keyof typeof PAGE_MESSAGE_TYPES];
 export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANALYSIS_MESSAGE_TYPES];
@@ -55,8 +60,9 @@ export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MES
 export type AuthMessageType = typeof AUTH_MESSAGE_TYPES[keyof typeof AUTH_MESSAGE_TYPES];
 export type MembershipMessageType = typeof MEMBERSHIP_MESSAGE_TYPES[keyof typeof MEMBERSHIP_MESSAGE_TYPES];
 export type WalletMessageType = typeof WALLET_MESSAGE_TYPES[keyof typeof WALLET_MESSAGE_TYPES];
+export type PolymarketMessageType = typeof POLYMARKET_MESSAGE_TYPES[keyof typeof POLYMARKET_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType | WalletMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType | WalletMessageType | PolymarketMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
@@ -66,6 +72,7 @@ const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(AUTH_MESSAGE_TYPES),
   ...Object.values(MEMBERSHIP_MESSAGE_TYPES),
   ...Object.values(WALLET_MESSAGE_TYPES),
+  ...Object.values(POLYMARKET_MESSAGE_TYPES),
 ]);
 
 // 创建回包

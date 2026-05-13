@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
+import { POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY } from '../../src/shared/config';
+import { SHOW_WALLET_SURFACE } from '../../src/shared/feature-flags';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
 import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
 import { getChainDisplay, isXLayerChain, XLAYER_MAINNET } from '../../src/shared/chains';
+import {
+  createEmptyPortfolioSnapshot,
+  decorateMatchesWithPortfolio,
+  normalizeEvmAddress,
+  type PortfolioSnapshot,
+} from '../../src/shared/portfolio';
 import {
   normalizeWalletProviderKey,
   shortenWalletAddress,
@@ -113,6 +121,44 @@ function statusTone(status: AnalysisStatus | ChannelStatus) {
   if (status === 'loading' || status === 'checking') return 'active';
   if (status === 'blocked') return 'muted';
   return 'neutral';
+}
+
+// 美元格式
+function formatUsd(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '$0.00';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numeric);
+}
+
+// 盈亏格式
+function formatSignedUsd(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) return '$0.00';
+  return `${numeric > 0 ? '+' : '-'}${formatUsd(Math.abs(numeric))}`;
+}
+
+// 盈亏色调
+function pnlTone(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric === 0) return 'text-(--ink-3)';
+  return numeric > 0 ? 'text-(--good)' : 'text-(--bad)';
+}
+
+// 时间文案
+function formatDateTime(value: unknown) {
+  const date = new Date(String(value || ''));
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 // 渲染图标
@@ -300,6 +346,11 @@ function OpportunityRow({ match }: { match: AnalysisMatch }) {
           >
             {direction.label}
           </span>
+          {match.isHeld ? (
+            <span className={`inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold ${pnlTone(match.heldCashPnl)}`}>
+              已持仓 · {match.heldOutcomeLabel || '仓位'} · {formatSignedUsd(match.heldCashPnl)}
+            </span>
+          ) : null}
         </span>
         {match.reason ? <span className="line-clamp-2 overflow-hidden text-xs leading-[1.45] text-(--ink-3)">{match.reason}</span> : null}
       </span>
@@ -365,12 +416,16 @@ function ResultBoard({
   status,
   result,
   error,
+  portfolioSnapshot,
 }: {
   status: AnalysisStatus;
   result: AnalysisResult | null;
   error: string;
+  portfolioSnapshot: PortfolioSnapshot | null;
 }) {
-  const matches = useMemo(() => getVisibleMatches(result), [result]);
+  const matches = useMemo(() => (
+    decorateMatchesWithPortfolio(getVisibleMatches(result), portfolioSnapshot)
+  ), [result, portfolioSnapshot]);
 
   if (status === 'loading') {
     return <EmptyResult status="loading" message="正在读取页面并匹配 Polymarket 盘口。" />;
@@ -410,6 +465,7 @@ function FeedView({
   ghostEnabled,
   result,
   error,
+  portfolioSnapshot,
   lastTitle,
   onAnalyze,
 }: {
@@ -418,6 +474,7 @@ function FeedView({
   ghostEnabled: boolean;
   result: AnalysisResult | null;
   error: string;
+  portfolioSnapshot: PortfolioSnapshot | null;
   lastTitle: string;
   onAnalyze: () => void;
 }) {
@@ -446,7 +503,7 @@ function FeedView({
         <span className="shrink-0 text-xs tabular-nums text-(--ink-3)">{summarizeAnalysis(result)}</span>
       </div>
 
-      <ResultBoard status={analysisStatus} result={result} error={error} />
+      <ResultBoard status={analysisStatus} result={result} error={error} portfolioSnapshot={portfolioSnapshot} />
     </section>
   );
 }
@@ -550,6 +607,151 @@ function WalletStatusBlock({
   );
 }
 
+// 来源标签
+function portfolioSourceLabel(snapshot: PortfolioSnapshot | null, walletLookupEnabled = SHOW_WALLET_SURFACE) {
+  if (snapshot?.source === 'manual') return '手动地址';
+  if (snapshot?.source === 'auto') return walletLookupEnabled ? '自动钱包' : '自动地址';
+  return walletLookupEnabled ? '未连接' : '未填写';
+}
+
+// 持仓区块
+function PortfolioBlock({
+  snapshot,
+  addressInput,
+  walletLookupEnabled,
+  busy,
+  error,
+  onAddressInputChange,
+  onSaveAddress,
+  onClearAddress,
+  onRefresh,
+}: {
+  snapshot: PortfolioSnapshot | null;
+  addressInput: string;
+  walletLookupEnabled: boolean;
+  busy: boolean;
+  error: string;
+  onAddressInputChange: (value: string) => void;
+  onSaveAddress: () => void;
+  onClearAddress: () => void;
+  onRefresh: () => void;
+}) {
+  const summary = snapshot?.summary;
+  const positions = Array.isArray(snapshot?.positions) ? snapshot.positions.slice(0, 6) : [];
+  const savedAddress = normalizeEvmAddress(addressInput);
+  const profileName = snapshot?.profile?.pseudonym
+    || snapshot?.profile?.name
+    || snapshot?.profile?.xUsername
+    || shortenWalletAddress(snapshot?.profileAddress)
+    || '尚未读取';
+  const fetchedText = snapshot?.fetchedAt ? formatDateTime(snapshot.fetchedAt) : '';
+  const emptyMessage = walletLookupEnabled
+    ? '未检测到持仓地址'
+    : '请手动填写 Polymarket 地址读取持仓';
+  const helperText = snapshot?.profileAddress
+    ? `${portfolioSourceLabel(snapshot, walletLookupEnabled)} · ${shortenWalletAddress(snapshot.profileAddress)}${fetchedText ? ` · ${fetchedText}` : ''}`
+    : snapshot?.message || emptyMessage;
+
+  return (
+    <div className="border-b border-(--rule) px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="block text-sm font-semibold text-(--ink-1)">Polymarket 持仓</span>
+          <span className="mt-0.5 block text-[11px] leading-[1.45] text-(--ink-3)">{profileName} · {helperText}</span>
+        </div>
+        <span className="inline-flex min-h-[22px] shrink-0 items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">
+          {portfolioSourceLabel(snapshot, walletLookupEnabled)}
+        </span>
+      </div>
+
+      <label className="mt-3 block">
+        <span className="mb-1.5 block text-[11px] font-semibold text-(--ink-3)">持仓地址</span>
+        <input
+          className="min-h-9 w-full rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-xs text-(--ink-1) outline-none transition-colors duration-160 placeholder:text-(--ink-4) focus:border-(--rule-strong)"
+          type="text"
+          inputMode="text"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="0x..."
+          value={addressInput}
+          onChange={(event) => onAddressInputChange(event.currentTarget.value)}
+          disabled={busy}
+        />
+      </label>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4)"
+          onClick={onSaveAddress}
+          disabled={busy}
+        >
+          {savedAddress ? '保存地址' : '保存'}
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4)"
+          onClick={onClearAddress}
+          disabled={busy || !addressInput}
+        >
+          {walletLookupEnabled ? '恢复自动' : '清除地址'}
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-(--ink-1) px-2.5 text-[11px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
+          onClick={onRefresh}
+          disabled={busy}
+        >
+          {busy ? '读取中' : '刷新持仓'}
+        </button>
+      </div>
+
+      {error ? <p className="mb-0 mt-2 text-[11px] leading-[1.45] text-(--bad)">{error}</p> : null}
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">仓位数</span>
+          <strong className="mt-1 block text-sm text-(--ink-1)">{Math.max(0, Number(summary?.positionCount || 0))}</strong>
+        </div>
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">当前市值</span>
+          <strong className="mt-1 block text-sm text-(--ink-1)">{formatUsd(summary?.totalCurrentValue)}</strong>
+        </div>
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">当前盈亏</span>
+          <strong className={`mt-1 block text-sm ${pnlTone(summary?.totalCashPnl)}`}>{formatSignedUsd(summary?.totalCashPnl)}</strong>
+        </div>
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">已实现盈亏</span>
+          <strong className={`mt-1 block text-sm ${pnlTone(summary?.totalRealizedPnl)}`}>{formatSignedUsd(summary?.totalRealizedPnl)}</strong>
+        </div>
+      </div>
+
+      <div className="mt-3 border-t border-(--rule)">
+        {positions.length ? positions.map((position) => (
+          <button
+            key={`${position.slug}-${position.outcome}-${position.id}`}
+            type="button"
+            className="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_auto] gap-3 border-0 border-b border-(--rule) bg-transparent px-0 py-2.5 text-left text-inherit transition-colors duration-160 hover:bg-(--surface)"
+            onClick={() => openMarket(position.slug ? `https://polymarket.com/market/${encodeURIComponent(position.slug)}` : null)}
+          >
+            <span className="min-w-0">
+              <span className="line-clamp-2 block text-xs font-semibold leading-[1.35] text-(--ink-1)">{position.title || '未命名盘口'}</span>
+              <span className="mt-1 inline-flex min-h-[20px] items-center rounded-full border border-(--rule) bg-(--paper) px-1.5 text-[10px] font-semibold text-(--ink-3)">{position.outcome || '仓位'}</span>
+            </span>
+            <span className="text-right">
+              <strong className="block text-xs text-(--ink-1)">{formatUsd(position.currentValue)}</strong>
+              <span className={`mt-1 block text-[10px] font-semibold ${pnlTone(position.cashPnl)}`}>{formatSignedUsd(position.cashPnl)}</span>
+            </span>
+          </button>
+        )) : (
+          <p className="mb-0 mt-3 text-[11px] leading-[1.45] text-(--ink-4)">{snapshot?.message || (walletLookupEnabled ? '当前没有读到持仓。' : '当前没有读到持仓，请先填写地址。')}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // 我的视图
 function ProfileView({
   user,
@@ -557,11 +759,19 @@ function ProfileView({
   walletProviderKey,
   walletBusy,
   walletError,
+  portfolioSnapshot,
+  portfolioAddressInput,
+  portfolioBusy,
+  portfolioError,
   logoutBusy,
   onWalletProviderChange,
   onWalletRefresh,
   onWalletConnect,
   onWalletSwitchXLayer,
+  onPortfolioAddressInputChange,
+  onPortfolioSaveAddress,
+  onPortfolioClearAddress,
+  onPortfolioRefresh,
   onLogout,
 }: {
   user: AuthUser;
@@ -569,25 +779,46 @@ function ProfileView({
   walletProviderKey: WalletProviderKey;
   walletBusy: boolean;
   walletError: string;
+  portfolioSnapshot: PortfolioSnapshot | null;
+  portfolioAddressInput: string;
+  portfolioBusy: boolean;
+  portfolioError: string;
   logoutBusy: boolean;
   onWalletProviderChange: (providerKey: WalletProviderKey) => void;
   onWalletRefresh: () => void;
   onWalletConnect: () => void;
   onWalletSwitchXLayer: () => void;
+  onPortfolioAddressInputChange: (value: string) => void;
+  onPortfolioSaveAddress: () => void;
+  onPortfolioClearAddress: () => void;
+  onPortfolioRefresh: () => void;
   onLogout: () => void;
 }) {
   return (
     <section id="view-profile" role="tabpanel" aria-labelledby="tab-profile">
       <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
-      <WalletStatusBlock
-        walletState={walletState}
-        providerKey={walletProviderKey}
-        busy={walletBusy}
-        error={walletError}
-        onProviderChange={onWalletProviderChange}
-        onRefresh={onWalletRefresh}
-        onConnect={onWalletConnect}
-        onSwitchXLayer={onWalletSwitchXLayer}
+      {SHOW_WALLET_SURFACE ? (
+        <WalletStatusBlock
+          walletState={walletState}
+          providerKey={walletProviderKey}
+          busy={walletBusy}
+          error={walletError}
+          onProviderChange={onWalletProviderChange}
+          onRefresh={onWalletRefresh}
+          onConnect={onWalletConnect}
+          onSwitchXLayer={onWalletSwitchXLayer}
+        />
+      ) : null}
+      <PortfolioBlock
+        snapshot={portfolioSnapshot}
+        addressInput={portfolioAddressInput}
+        walletLookupEnabled={SHOW_WALLET_SURFACE}
+        busy={portfolioBusy}
+        error={portfolioError}
+        onAddressInputChange={onPortfolioAddressInputChange}
+        onSaveAddress={onPortfolioSaveAddress}
+        onClearAddress={onPortfolioClearAddress}
+        onRefresh={onPortfolioRefresh}
       />
     </section>
   );
@@ -647,6 +878,10 @@ export function App() {
   const [walletState, setWalletState] = useState<WalletState | null>(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletError, setWalletError] = useState('');
+  const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioSnapshot | null>(null);
+  const [portfolioAddressInput, setPortfolioAddressInput] = useState('');
+  const [portfolioBusy, setPortfolioBusy] = useState(false);
+  const [portfolioError, setPortfolioError] = useState('');
 
   // 应用幽灵态
   function applyGhostPayload(payload: GhostStatePayload | null | undefined) {
@@ -732,7 +967,8 @@ export function App() {
 
     void refreshAuthUser();
     void refreshGhostStateForActiveTab();
-    void refreshWalletState({ silent: true });
+    if (SHOW_WALLET_SURFACE) void refreshWalletState({ silent: true });
+    void loadPortfolioAddressPreference();
 
     // 监听运行态
     const handleRuntimeMessage = (message: unknown) => {
@@ -915,6 +1151,9 @@ export function App() {
           : WALLET_MESSAGE_TYPES.getState;
       const nextState = await sendWalletMessage(type, normalizedProviderKey);
       setWalletState(nextState);
+      if (!portfolioAddressInput.trim()) {
+        void refreshPortfolioSnapshot({ force: true, silent: true });
+      }
     } catch (error) {
       setWalletError(error instanceof Error ? error.message : String(error || '钱包操作失败'));
     } finally {
@@ -926,6 +1165,114 @@ export function App() {
   function handleWalletProviderChange(providerKey: WalletProviderKey) {
     setWalletProviderKey(providerKey);
     void runWalletAction('refresh', providerKey);
+  }
+
+  // 读地址偏好
+  async function loadPortfolioAddressPreference() {
+    const result = await browser.storage.local
+      .get(POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY)
+      .catch(() => ({}));
+    const normalized = normalizeEvmAddress(result[POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY]);
+    const nextAddress = normalized || '';
+    setPortfolioAddressInput(nextAddress);
+    await refreshPortfolioSnapshot({ address: nextAddress, silent: true });
+  }
+
+  // 请求持仓
+  async function requestPortfolioSnapshot(options: { address?: string; force?: boolean } = {}) {
+    const rawAddress = options.address ?? portfolioAddressInput;
+    const normalizedAddress = normalizeEvmAddress(rawAddress);
+
+    if (!SHOW_WALLET_SURFACE && String(rawAddress || '').trim() && !normalizedAddress) {
+      throw new Error('请输入有效的 EVM 地址');
+    }
+
+    if (!SHOW_WALLET_SURFACE && !normalizedAddress) {
+      return createEmptyPortfolioSnapshot({
+        source: 'none',
+        mode: 'unresolved',
+        message: '请手动填写 Polymarket 地址读取持仓。',
+      });
+    }
+
+    const response = await browser.runtime
+      .sendMessage({
+        type: POLYMARKET_MESSAGE_TYPES.getPortfolio,
+        address: normalizedAddress || rawAddress || null,
+        providerKey: SHOW_WALLET_SURFACE ? walletProviderKey : null,
+        force: Boolean(options.force),
+      })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (!response?.ok || !response.data) {
+      throw new Error(response?.error || '持仓读取失败');
+    }
+
+    return response.data as PortfolioSnapshot;
+  }
+
+  // 刷新持仓
+  async function refreshPortfolioSnapshot(options: { address?: string; force?: boolean; silent?: boolean } = {}) {
+    const address = options.address ?? portfolioAddressInput;
+    if (!options.silent) {
+      setPortfolioBusy(true);
+      setPortfolioError('');
+    }
+
+    try {
+      const snapshot = await requestPortfolioSnapshot({
+        address,
+        force: options.force,
+      });
+      setPortfolioSnapshot(snapshot);
+      if (!options.silent) setPortfolioError('');
+      return snapshot;
+    } catch (error) {
+      if (!options.silent) {
+        setPortfolioError(error instanceof Error ? error.message : String(error || '持仓读取失败'));
+      }
+      return null;
+    } finally {
+      if (!options.silent) setPortfolioBusy(false);
+    }
+  }
+
+  // 保存地址
+  async function handlePortfolioSaveAddress() {
+    const normalized = normalizeEvmAddress(portfolioAddressInput);
+    if (!normalized) {
+      setPortfolioError('请输入有效的 EVM 地址');
+      return;
+    }
+
+    setPortfolioBusy(true);
+    setPortfolioError('');
+    try {
+      await browser.storage.local.set({
+        [POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY]: normalized,
+      });
+      setPortfolioAddressInput(normalized);
+      await refreshPortfolioSnapshot({ address: normalized, force: true, silent: true });
+    } catch (error) {
+      setPortfolioError(error instanceof Error ? error.message : String(error || '地址保存失败'));
+    } finally {
+      setPortfolioBusy(false);
+    }
+  }
+
+  // 清除地址
+  async function handlePortfolioClearAddress() {
+    setPortfolioBusy(true);
+    setPortfolioError('');
+    try {
+      await browser.storage.local.remove(POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY);
+      setPortfolioAddressInput('');
+      await refreshPortfolioSnapshot({ address: '', force: true, silent: true });
+    } catch (error) {
+      setPortfolioError(error instanceof Error ? error.message : String(error || '地址清除失败'));
+    } finally {
+      setPortfolioBusy(false);
+    }
   }
 
   // 退出登录
@@ -992,6 +1339,7 @@ export function App() {
             ghostEnabled={ghostEnabled}
             result={analysisResult}
             error={analysisError}
+            portfolioSnapshot={portfolioSnapshot}
             lastTitle={lastTitle}
             onAnalyze={handleAnalyzeClick}
           />
@@ -1003,11 +1351,19 @@ export function App() {
             walletProviderKey={walletProviderKey}
             walletBusy={walletBusy}
             walletError={walletError}
+            portfolioSnapshot={portfolioSnapshot}
+            portfolioAddressInput={portfolioAddressInput}
+            portfolioBusy={portfolioBusy}
+            portfolioError={portfolioError}
             logoutBusy={logoutBusy}
             onWalletProviderChange={handleWalletProviderChange}
             onWalletRefresh={() => runWalletAction('refresh')}
             onWalletConnect={() => runWalletAction('connect')}
             onWalletSwitchXLayer={() => runWalletAction('switch')}
+            onPortfolioAddressInputChange={setPortfolioAddressInput}
+            onPortfolioSaveAddress={handlePortfolioSaveAddress}
+            onPortfolioClearAddress={handlePortfolioClearAddress}
+            onPortfolioRefresh={() => refreshPortfolioSnapshot({ force: true })}
             onLogout={handleLogout}
           />
         </div>

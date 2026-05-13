@@ -33,3 +33,6 @@ export const AUTH_REFRESH_TOKEN_STORAGE_KEY = 'murmray:auth_refresh_token';
 
 // 用户缓存
 export const AUTH_USER_STORAGE_KEY = 'murmray:auth_user';
+
+// 持仓地址
+export const POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY = 'murmray:polymarket_portfolio_address';
