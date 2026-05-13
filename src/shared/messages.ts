@@ -41,14 +41,22 @@ export const MEMBERSHIP_MESSAGE_TYPES = Object.freeze({
   getCatalog: 'membership:get_catalog',
 } as const);
 
+// 钱包消息
+export const WALLET_MESSAGE_TYPES = Object.freeze({
+  getState: 'wallet:get_state',
+  connect: 'wallet:connect',
+  switchXLayer: 'wallet:switch_xlayer',
+} as const);
+
 export type CoreMessageType = typeof CORE_MESSAGE_TYPES[keyof typeof CORE_MESSAGE_TYPES];
 export type PageMessageType = typeof PAGE_MESSAGE_TYPES[keyof typeof PAGE_MESSAGE_TYPES];
 export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANALYSIS_MESSAGE_TYPES];
 export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MESSAGE_TYPES];
 export type AuthMessageType = typeof AUTH_MESSAGE_TYPES[keyof typeof AUTH_MESSAGE_TYPES];
 export type MembershipMessageType = typeof MEMBERSHIP_MESSAGE_TYPES[keyof typeof MEMBERSHIP_MESSAGE_TYPES];
+export type WalletMessageType = typeof WALLET_MESSAGE_TYPES[keyof typeof WALLET_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType | WalletMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
@@ -57,6 +65,7 @@ const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(GHOST_MESSAGE_TYPES),
   ...Object.values(AUTH_MESSAGE_TYPES),
   ...Object.values(MEMBERSHIP_MESSAGE_TYPES),
+  ...Object.values(WALLET_MESSAGE_TYPES),
 ]);
 
 // 创建回包

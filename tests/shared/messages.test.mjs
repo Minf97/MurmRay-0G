@@ -7,6 +7,7 @@ import {
   createCorePong,
   GHOST_MESSAGE_TYPES,
   MEMBERSHIP_MESSAGE_TYPES,
+  WALLET_MESSAGE_TYPES,
   isKnownMessageType,
   isCoreMessageType,
   PAGE_MESSAGE_TYPES,
@@ -51,6 +52,12 @@ test('message constants expose app channels', () => {
     getStatus: 'membership:get_status',
     getCatalog: 'membership:get_catalog',
   });
+
+  assert.deepEqual(WALLET_MESSAGE_TYPES, {
+    getState: 'wallet:get_state',
+    connect: 'wallet:connect',
+    switchXLayer: 'wallet:switch_xlayer',
+  });
 });
 
 test('createCorePong returns pong payload', () => {
@@ -72,5 +79,6 @@ test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(GHOST_MESSAGE_TYPES.stateUpdated), true);
   assert.equal(isKnownMessageType(AUTH_MESSAGE_TYPES.stateChanged), true);
   assert.equal(isKnownMessageType(MEMBERSHIP_MESSAGE_TYPES.getStatus), true);
+  assert.equal(isKnownMessageType(WALLET_MESSAGE_TYPES.switchXLayer), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });

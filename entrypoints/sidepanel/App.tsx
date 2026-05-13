@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
 import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
+import { getChainDisplay, isXLayerChain, XLAYER_MAINNET } from '../../src/shared/chains';
+import {
+  normalizeWalletProviderKey,
+  shortenWalletAddress,
+  WALLET_PROVIDER_OPTIONS,
+  type WalletProviderKey,
+  type WalletState,
+} from '../../src/shared/wallet';
 import {
   getDirectionMeta,
   getScoreTier,
@@ -20,6 +28,7 @@ import { AuthLoading, AuthPanel, UserProfile, type AuthStatus } from './auth-pan
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
 type ActiveTabInfo = { id: number; title: string };
+type WalletAction = 'refresh' | 'connect' | 'switch';
 
 const STATUS_COPY: Record<ChannelStatus, string> = {
   checking: '检测中',
@@ -442,19 +451,144 @@ function FeedView({
   );
 }
 
+// 钱包标签
+function walletBadgeLabel(walletState: WalletState | null, busy: boolean, error: string) {
+  if (busy && !walletState) return '检测中';
+  if (error) return '异常';
+  if (!walletState?.hasProvider) return '未检测';
+  if (!walletState.connected) return '未连接';
+  if (isXLayerChain(walletState.chainId)) return 'X Layer';
+  return getChainDisplay(walletState.chainId).name;
+}
+
+// 钱包详情
+function WalletStatusBlock({
+  walletState,
+  providerKey,
+  busy,
+  error,
+  onProviderChange,
+  onRefresh,
+  onConnect,
+  onSwitchXLayer,
+}: {
+  walletState: WalletState | null;
+  providerKey: WalletProviderKey;
+  busy: boolean;
+  error: string;
+  onProviderChange: (providerKey: WalletProviderKey) => void;
+  onRefresh: () => void;
+  onConnect: () => void;
+  onSwitchXLayer: () => void;
+}) {
+  const chain = getChainDisplay(walletState?.chainId);
+  const accountLabel = shortenWalletAddress(walletState?.account);
+  const statusText = error || (walletState?.connected
+    ? `${walletState.walletLabel} · ${accountLabel || '已连接'} · ${chain.name}`
+    : walletState?.hasProvider
+      ? `${walletState.walletLabel} · 未连接`
+      : '在普通网页中检测浏览器钱包');
+  const onTargetChain = isXLayerChain(walletState?.chainId);
+
+  return (
+    <div className="border-b border-(--rule) px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="block text-sm font-semibold text-(--ink-1)">钱包</span>
+          <span className={`mt-0.5 block text-[11px] leading-[1.45] ${error ? 'text-(--bad)' : 'text-(--ink-3)'}`}>{statusText}</span>
+        </div>
+        <span className="inline-flex min-h-[22px] shrink-0 items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">
+          {walletBadgeLabel(walletState, busy, error)}
+        </span>
+      </div>
+
+      <div className="mt-3 inline-flex rounded-lg border border-(--rule) bg-(--surface) p-0.5">
+        {WALLET_PROVIDER_OPTIONS.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            className={`min-h-7 cursor-pointer rounded-md border-0 px-2.5 text-[11px] font-semibold transition-colors duration-160 disabled:cursor-progress ${
+              providerKey === option.key
+                ? 'bg-(--paper) text-(--ink-1) [box-shadow:0_1px_2px_rgb(17_24_39/8%)]'
+                : 'bg-transparent text-(--ink-3) hover:text-(--ink-1)'
+            }`}
+            onClick={() => onProviderChange(option.key)}
+            disabled={busy}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4)"
+          onClick={onRefresh}
+          disabled={busy}
+        >
+          刷新
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4)"
+          onClick={onConnect}
+          disabled={busy}
+        >
+          连接
+        </button>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-(--ink-1) px-2.5 text-[11px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
+          onClick={onSwitchXLayer}
+          disabled={busy || onTargetChain}
+        >
+          {onTargetChain ? '已在 X Layer' : `切换 ${XLAYER_MAINNET.chainName}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // 我的视图
 function ProfileView({
   user,
+  walletState,
+  walletProviderKey,
+  walletBusy,
+  walletError,
   logoutBusy,
+  onWalletProviderChange,
+  onWalletRefresh,
+  onWalletConnect,
+  onWalletSwitchXLayer,
   onLogout,
 }: {
   user: AuthUser;
+  walletState: WalletState | null;
+  walletProviderKey: WalletProviderKey;
+  walletBusy: boolean;
+  walletError: string;
   logoutBusy: boolean;
+  onWalletProviderChange: (providerKey: WalletProviderKey) => void;
+  onWalletRefresh: () => void;
+  onWalletConnect: () => void;
+  onWalletSwitchXLayer: () => void;
   onLogout: () => void;
 }) {
   return (
     <section id="view-profile" role="tabpanel" aria-labelledby="tab-profile">
       <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
+      <WalletStatusBlock
+        walletState={walletState}
+        providerKey={walletProviderKey}
+        busy={walletBusy}
+        error={walletError}
+        onProviderChange={onWalletProviderChange}
+        onRefresh={onWalletRefresh}
+        onConnect={onWalletConnect}
+        onSwitchXLayer={onWalletSwitchXLayer}
+      />
     </section>
   );
 }
@@ -509,6 +643,10 @@ export function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState('');
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [walletProviderKey, setWalletProviderKey] = useState<WalletProviderKey>('auto');
+  const [walletState, setWalletState] = useState<WalletState | null>(null);
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletError, setWalletError] = useState('');
 
   // 应用幽灵态
   function applyGhostPayload(payload: GhostStatePayload | null | undefined) {
@@ -594,6 +732,7 @@ export function App() {
 
     void refreshAuthUser();
     void refreshGhostStateForActiveTab();
+    void refreshWalletState({ silent: true });
 
     // 监听运行态
     const handleRuntimeMessage = (message: unknown) => {
@@ -726,6 +865,69 @@ export function App() {
     setAuthError(response?.error || 'Google 登录失败');
   }
 
+  // 请求钱包
+  async function sendWalletMessage(type: string, providerKey: WalletProviderKey) {
+    const response = await browser.runtime
+      .sendMessage({ type, providerKey })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (!response?.ok || !response.data) {
+      throw new Error(response?.error || '钱包请求失败');
+    }
+
+    return response.data as WalletState;
+  }
+
+  // 读取钱包
+  async function refreshWalletState(options: { providerKey?: WalletProviderKey; silent?: boolean } = {}) {
+    const providerKey = normalizeWalletProviderKey(options.providerKey || walletProviderKey);
+    if (!options.silent) {
+      setWalletBusy(true);
+      setWalletError('');
+    }
+
+    try {
+      const nextState = await sendWalletMessage(WALLET_MESSAGE_TYPES.getState, providerKey);
+      setWalletState(nextState);
+      if (!options.silent) setWalletError('');
+      return nextState;
+    } catch (error) {
+      if (!options.silent) {
+        setWalletError(error instanceof Error ? error.message : String(error || '钱包状态读取失败'));
+      }
+      return null;
+    } finally {
+      if (!options.silent) setWalletBusy(false);
+    }
+  }
+
+  // 钱包操作
+  async function runWalletAction(action: WalletAction, providerKey = walletProviderKey) {
+    const normalizedProviderKey = normalizeWalletProviderKey(providerKey);
+    setWalletBusy(true);
+    setWalletError('');
+
+    try {
+      const type = action === 'connect'
+        ? WALLET_MESSAGE_TYPES.connect
+        : action === 'switch'
+          ? WALLET_MESSAGE_TYPES.switchXLayer
+          : WALLET_MESSAGE_TYPES.getState;
+      const nextState = await sendWalletMessage(type, normalizedProviderKey);
+      setWalletState(nextState);
+    } catch (error) {
+      setWalletError(error instanceof Error ? error.message : String(error || '钱包操作失败'));
+    } finally {
+      setWalletBusy(false);
+    }
+  }
+
+  // 选择钱包
+  function handleWalletProviderChange(providerKey: WalletProviderKey) {
+    setWalletProviderKey(providerKey);
+    void runWalletAction('refresh', providerKey);
+  }
+
   // 退出登录
   async function handleLogout() {
     setLogoutBusy(true);
@@ -795,7 +997,19 @@ export function App() {
           />
         </div>
         <div hidden={activeTab !== 'profile'}>
-          <ProfileView user={authUser} logoutBusy={logoutBusy} onLogout={handleLogout} />
+          <ProfileView
+            user={authUser}
+            walletState={walletState}
+            walletProviderKey={walletProviderKey}
+            walletBusy={walletBusy}
+            walletError={walletError}
+            logoutBusy={logoutBusy}
+            onWalletProviderChange={handleWalletProviderChange}
+            onWalletRefresh={() => runWalletAction('refresh')}
+            onWalletConnect={() => runWalletAction('connect')}
+            onWalletSwitchXLayer={() => runWalletAction('switch')}
+            onLogout={handleLogout}
+          />
         </div>
         <div hidden={activeTab !== 'settings'}>
           <SettingsView

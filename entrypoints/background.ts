@@ -1,8 +1,9 @@
 import { browser } from 'wxt/browser';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, WALLET_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
 import { createGhostModeController } from '../src/background/ghost-mode';
 import { createAuthController } from '../src/background/auth';
 import { createMembershipController } from '../src/background/membership';
+import { createWalletController } from '../src/background/wallet';
 import type { Browser } from 'wxt/browser';
 
 type RuntimeMessage = {
@@ -13,6 +14,7 @@ type RuntimeMessage = {
   allowBlacklisted?: unknown;
   triggerSource?: unknown;
   force?: unknown;
+  providerKey?: unknown;
 };
 
 type RuntimeSender = Browser.runtime.MessageSender;
@@ -47,6 +49,7 @@ function handleRuntimeMessage(
   ghostMode: ReturnType<typeof createGhostModeController>,
   auth: ReturnType<typeof createAuthController>,
   membership: ReturnType<typeof createMembershipController>,
+  wallet: ReturnType<typeof createWalletController>,
 ) {
   if (!isRuntimeMessage(message)) {
     return false;
@@ -196,6 +199,39 @@ function handleRuntimeMessage(
     return true;
   }
 
+  if (message.type === WALLET_MESSAGE_TYPES.getState) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await wallet.getWalletState(message.providerKey) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === WALLET_MESSAGE_TYPES.connect) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await wallet.connectWallet(message.providerKey) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === WALLET_MESSAGE_TYPES.switchXLayer) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await wallet.switchToXLayer(message.providerKey) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   return false;
 }
 
@@ -208,6 +244,7 @@ export default defineBackground(() => {
 
   // 免费策略
   const ghostMode = createGhostModeController({ browser });
+  const wallet = createWalletController({ browser });
 
   // 初始化面板
   browser.runtime.onInstalled.addListener(() => {
@@ -223,7 +260,7 @@ export default defineBackground(() => {
 
   // 监听消息
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => (
-    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth, membership)
+    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth, membership, wallet)
   ));
 
   // 清理标签
