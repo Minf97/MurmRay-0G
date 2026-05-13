@@ -35,13 +35,20 @@ export const AUTH_MESSAGE_TYPES = Object.freeze({
   stateChanged: 'auth:state_changed',
 } as const);
 
+// 会员消息
+export const MEMBERSHIP_MESSAGE_TYPES = Object.freeze({
+  getStatus: 'membership:get_status',
+  getCatalog: 'membership:get_catalog',
+} as const);
+
 export type CoreMessageType = typeof CORE_MESSAGE_TYPES[keyof typeof CORE_MESSAGE_TYPES];
 export type PageMessageType = typeof PAGE_MESSAGE_TYPES[keyof typeof PAGE_MESSAGE_TYPES];
 export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANALYSIS_MESSAGE_TYPES];
 export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MESSAGE_TYPES];
 export type AuthMessageType = typeof AUTH_MESSAGE_TYPES[keyof typeof AUTH_MESSAGE_TYPES];
+export type MembershipMessageType = typeof MEMBERSHIP_MESSAGE_TYPES[keyof typeof MEMBERSHIP_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
@@ -49,6 +56,7 @@ const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(ANALYSIS_MESSAGE_TYPES),
   ...Object.values(GHOST_MESSAGE_TYPES),
   ...Object.values(AUTH_MESSAGE_TYPES),
+  ...Object.values(MEMBERSHIP_MESSAGE_TYPES),
 ]);
 
 // 创建回包

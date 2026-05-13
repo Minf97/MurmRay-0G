@@ -18,6 +18,9 @@ export default defineConfig({
       origin: 'http://localhost:3003',
     },
   },
+  webExt: {
+    disabled: process.env.WXT_MANUAL === '1',
+  },
   manifest: {
     default_locale: 'en',
     minimum_chrome_version: MINIMUM_CHROME_VERSION,

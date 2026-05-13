@@ -1,7 +1,8 @@
 import { browser } from 'wxt/browser';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
 import { createGhostModeController } from '../src/background/ghost-mode';
 import { createAuthController } from '../src/background/auth';
+import { createMembershipController } from '../src/background/membership';
 import type { Browser } from 'wxt/browser';
 
 type RuntimeMessage = {
@@ -11,6 +12,7 @@ type RuntimeMessage = {
   tabId?: unknown;
   allowBlacklisted?: unknown;
   triggerSource?: unknown;
+  force?: unknown;
 };
 
 type RuntimeSender = Browser.runtime.MessageSender;
@@ -44,6 +46,7 @@ function handleRuntimeMessage(
   sendResponse: RuntimeResponse,
   ghostMode: ReturnType<typeof createGhostModeController>,
   auth: ReturnType<typeof createAuthController>,
+  membership: ReturnType<typeof createMembershipController>,
 ) {
   if (!isRuntimeMessage(message)) {
     return false;
@@ -171,12 +174,40 @@ function handleRuntimeMessage(
     return true;
   }
 
+  if (message.type === MEMBERSHIP_MESSAGE_TYPES.getStatus) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await membership.getMembershipStatus() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === MEMBERSHIP_MESSAGE_TYPES.getCatalog) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await membership.getPricingCatalog({ force: Boolean(message.force) }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   return false;
 }
 
 export default defineBackground(() => {
-  const ghostMode = createGhostModeController({ browser });
   const auth = createAuthController({ browser });
+  const membership = createMembershipController({
+    browser,
+    getAuthUser: auth.getUser,
+  });
+
+  // 免费策略
+  const ghostMode = createGhostModeController({ browser });
 
   // 初始化面板
   browser.runtime.onInstalled.addListener(() => {
@@ -192,7 +223,7 @@ export default defineBackground(() => {
 
   // 监听消息
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => (
-    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth)
+    handleRuntimeMessage(message, sender, sendResponse, ghostMode, auth, membership)
   ));
 
   // 清理标签

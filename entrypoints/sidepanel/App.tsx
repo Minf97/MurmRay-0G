@@ -455,11 +455,6 @@ function ProfileView({
   return (
     <section id="view-profile" role="tabpanel" aria-labelledby="tab-profile">
       <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
-
-      <div className="flex min-h-[60px] items-center justify-between gap-3 border-b border-(--rule) px-4">
-        <span className="text-sm font-semibold text-(--ink-1)">会员状态</span>
-        <span className="inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">待迁移</span>
-      </div>
     </section>
   );
 }

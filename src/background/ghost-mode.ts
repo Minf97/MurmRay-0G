@@ -46,6 +46,7 @@ type GhostStorage = {
 type GhostControllerOptions = {
   browser: Browser;
   analyzePage?: (pageContext: PageContext) => Promise<AnalysisResult>;
+  consumeAnalysisQuota?: () => Promise<unknown>;
   now?: () => number;
   createRequestId?: () => string;
 };
@@ -117,6 +118,7 @@ export function createGhostModeController(options: GhostControllerOptions) {
   const browser = options.browser;
   const storage = browser.storage.local as GhostStorage;
   const analyzePage = options.analyzePage || invokePolymarketAnalysis;
+  const consumeAnalysisQuota = options.consumeAnalysisQuota || (async () => undefined);
   const now = options.now || (() => Date.now());
   const createRequestId = options.createRequestId || (() => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 
@@ -228,8 +230,10 @@ export function createGhostModeController(options: GhostControllerOptions) {
       return { result: await existing, cached: false };
     }
 
-    const promise = analyzePage(pageContext)
-      .then((result) => normalizeAnalysisResult(result));
+    const promise = (async () => {
+      await consumeAnalysisQuota();
+      return normalizeAnalysisResult(await analyzePage(pageContext));
+    })();
 
     inFlightByPageKey.set(pageKey, promise);
     try {

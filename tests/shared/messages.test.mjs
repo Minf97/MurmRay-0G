@@ -6,6 +6,7 @@ import {
   CORE_MESSAGE_TYPES,
   createCorePong,
   GHOST_MESSAGE_TYPES,
+  MEMBERSHIP_MESSAGE_TYPES,
   isKnownMessageType,
   isCoreMessageType,
   PAGE_MESSAGE_TYPES,
@@ -45,6 +46,11 @@ test('message constants expose app channels', () => {
     logout: 'auth:logout',
     stateChanged: 'auth:state_changed',
   });
+
+  assert.deepEqual(MEMBERSHIP_MESSAGE_TYPES, {
+    getStatus: 'membership:get_status',
+    getCatalog: 'membership:get_catalog',
+  });
 });
 
 test('createCorePong returns pong payload', () => {
@@ -65,5 +71,6 @@ test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(ANALYSIS_MESSAGE_TYPES.analyzePage), true);
   assert.equal(isKnownMessageType(GHOST_MESSAGE_TYPES.stateUpdated), true);
   assert.equal(isKnownMessageType(AUTH_MESSAGE_TYPES.stateChanged), true);
+  assert.equal(isKnownMessageType(MEMBERSHIP_MESSAGE_TYPES.getStatus), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });

@@ -138,8 +138,12 @@ test('ghost mode reuses in-flight analysis for the same page', async () => {
 test('ghost mode returns cached result after first analysis', async () => {
   const mock = createBrowserMock();
   let analyzeCalls = 0;
+  let quotaCalls = 0;
   const controller = createGhostModeController({
     browser: mock.browser,
+    consumeAnalysisQuota: async () => {
+      quotaCalls += 1;
+    },
     analyzePage: async () => {
       analyzeCalls += 1;
       return { totalMarkets: 3, matches: [] };
@@ -154,8 +158,31 @@ test('ghost mode returns cached result after first analysis', async () => {
   const second = await controller.analyzePageContext(SAMPLE_PAGE, { tabId: 3 });
 
   assert.equal(analyzeCalls, 1);
+  assert.equal(quotaCalls, 1);
   assert.equal(first.payload.cached, false);
   assert.equal(second.payload.cached, true);
   assert.equal(second.payload.status, 'no_opportunity');
   assert.equal(mock.runtimeMessages.some((message) => message.type === GHOST_MESSAGE_TYPES.stateUpdated), true);
+});
+
+test('ghost mode stops analysis when quota check fails', async () => {
+  const mock = createBrowserMock();
+  let analyzeCalls = 0;
+  const controller = createGhostModeController({
+    browser: mock.browser,
+    consumeAnalysisQuota: async () => {
+      throw new Error('额度已用完');
+    },
+    analyzePage: async () => {
+      analyzeCalls += 1;
+      return { totalMarkets: 3, matches: [] };
+    },
+    createRequestId: () => 'req-1',
+  });
+
+  const response = await controller.analyzePageContext(SAMPLE_PAGE, { tabId: 3 });
+  assert.equal(response.ok, false);
+  assert.equal(response.error, '额度已用完');
+  assert.equal(analyzeCalls, 0);
+  assert.equal(controller.getTabState(3).status, 'error');
 });

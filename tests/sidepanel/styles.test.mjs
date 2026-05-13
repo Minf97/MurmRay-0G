@@ -35,3 +35,9 @@ test('sidepanel does not keep a separate style map module', async () => {
     /ENOENT/,
   );
 });
+
+test('sidepanel keeps membership surface hidden', async () => {
+  const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+
+  assert.doesNotMatch(app, /会员状态|补充额度|MEMBERSHIP_MESSAGE_TYPES|refreshMembershipStatus/);
+});

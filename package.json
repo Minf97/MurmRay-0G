@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "wxt",
+    "dev:manual": "WXT_MANUAL=1 wxt",
     "dev:extension": "wxt",
     "dev:extension:firefox": "wxt -b firefox",
     "dev:firefox": "wxt -b firefox",
