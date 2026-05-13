@@ -35,9 +35,9 @@ function GoogleMark() {
 // 加载认证
 export function AuthLoading() {
   return (
-    <main className="sidepanel-shell auth-shell">
-      <div className="auth-loading" aria-label="正在读取登录态">
-        <span className="auth-spinner" aria-hidden="true" />
+    <main className="grid min-h-screen place-items-center bg-(--paper) px-[18px] py-6 text-(--ink-1)">
+      <div className="inline-flex size-12 items-center justify-center" aria-label="正在读取登录态">
+        <span className="size-7 animate-spin rounded-full border-2 border-(--rule) border-t-(--ink-1)" aria-hidden="true" />
       </div>
     </main>
   );
@@ -48,23 +48,23 @@ export function AuthPanel({ status, error, onGoogleLogin }: AuthPanelProps) {
   const busy = status === 'checking';
 
   return (
-    <main className="sidepanel-shell auth-shell">
-      <section className="auth-box" aria-label="登录">
-        <p className="auth-eyebrow">MurmRay</p>
-        <h1>把日常浏览变成交易线索</h1>
-        <p className="auth-subtitle">为你扫描 Polymarket，标出值得下注的盘口。</p>
+    <main className="grid min-h-screen place-items-center bg-(--paper) px-[18px] py-6 text-(--ink-1)">
+      <section className="w-[min(100%,320px)]" aria-label="登录">
+        <p className="m-0 mb-2 text-xs font-extrabold uppercase tracking-normal text-(--accent)">MurmRay</p>
+        <h1 className="m-0 text-[28px] font-bold leading-[1.12] text-(--ink-1)">把日常浏览变成交易线索</h1>
+        <p className="mb-[22px] mt-3 text-sm leading-[1.55] text-(--ink-3)">为你扫描 Polymarket，标出值得下注的盘口。</p>
 
         <button
           type="button"
-          className="btn btn-google"
+          className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-[9px] whitespace-nowrap rounded-lg border border-(--rule) bg-(--paper) px-[13px] text-[13px] font-semibold text-(--ink-1) transition-colors duration-[160ms] hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4) [box-shadow:0_1px_2px_rgb(17_24_39_/_8%)]"
           onClick={onGoogleLogin}
           disabled={busy}
         >
-          <span className="google-mark"><GoogleMark /></span>
+          <span className="size-[18px] [&_svg]:size-[18px]"><GoogleMark /></span>
           <span>{busy ? '登录中' : '使用 Google 继续'}</span>
         </button>
 
-        {error ? <p className="auth-error">{error}</p> : null}
+        {error ? <p className="mb-0 mt-3 min-h-5 text-xs leading-normal text-(--bad)">{error}</p> : null}
       </section>
     </main>
   );
@@ -73,15 +73,15 @@ export function AuthPanel({ status, error, onGoogleLogin }: AuthPanelProps) {
 // 用户资料
 export function UserProfile({ user, logoutBusy, onLogout }: UserProfileProps) {
   return (
-    <div className="profile-block">
-      <span className="profile-avatar" aria-hidden="true">{getUserInitial(user)}</span>
-      <div className="profile-copy">
-        <h2>{user.email || user.profile.name || '用户'}</h2>
-        <p>{user.profile.name || 'Google 登录'}</p>
+    <div className="flex items-center gap-3 border-b border-(--rule) px-4 py-6">
+      <span className="inline-flex size-11 items-center justify-center rounded-full bg-(--ink-1) text-lg font-bold text-(--paper)" aria-hidden="true">{getUserInitial(user)}</span>
+      <div className="min-w-0 flex-1">
+        <h2 className="m-0 truncate text-base font-[650] text-(--ink-1)">{user.email || user.profile.name || '用户'}</h2>
+        <p className="mb-0 mt-1 truncate text-[13px] text-(--ink-3)">{user.profile.name || 'Google 登录'}</p>
       </div>
       <button
         type="button"
-        className="btn btn-secondary"
+        className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-(--rule) bg-(--paper) px-[13px] text-[13px] font-semibold text-(--ink-2) transition-colors duration-[160ms] hover:border-(--rule-strong) hover:bg-(--surface) hover:text-(--ink-1) disabled:cursor-progress disabled:text-(--ink-4)"
         onClick={onLogout}
         disabled={logoutBusy}
       >

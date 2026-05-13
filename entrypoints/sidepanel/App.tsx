@@ -162,10 +162,10 @@ function TabButton({
       role="tab"
       aria-selected={isActive}
       aria-controls={`view-${tab.key}`}
-      className={`tab-bar-item${isActive ? ' is-active' : ''}`}
+      className={`relative z-1 inline-flex min-h-9 flex-1 basis-0 cursor-pointer items-center justify-center gap-1.5 rounded-full border-0 bg-transparent text-[13px] font-medium transition-colors duration-160 hover:text-(--ink-1) ${isActive ? 'text-(--ink-1)' : 'text-(--ink-3)'}`}
       onClick={() => onSelect(tab.key)}
     >
-      <span className="tab-bar-icon">
+      <span className="size-4 [&_svg]:size-4">
         <TabIcon tab={tab.key} />
       </span>
       <span>{tab.label}</span>
@@ -174,10 +174,23 @@ function TabButton({
 }
 
 // 状态圆点
-function StatusPill({ label, tone }: { label: string; tone: string }) {
+function StatusPill({ label, tone }: { label: string; tone: ReturnType<typeof statusTone> }) {
   return (
-    <span className={`status-pill ${tone}`}>
-      <span className="status-dot" aria-hidden="true" />
+    <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-(--ink-2)">
+      <span
+        className={`size-[7px] rounded-full ${
+          tone === 'success'
+            ? 'bg-(--good)'
+            : tone === 'danger'
+              ? 'bg-(--bad)'
+              : tone === 'active'
+                ? 'bg-(--accent)'
+                : tone === 'muted'
+                  ? 'bg-(--amber)'
+                  : 'bg-(--ink-4)'
+        }`}
+        aria-hidden="true"
+      />
       {label}
     </span>
   );
@@ -192,11 +205,19 @@ function ScoreGauge({ score }: { score: number }) {
   const dashOffset = circumference * (1 - safeScore / 100);
 
   return (
-    <span className="gauge-shell">
-      <svg className="gauge" viewBox="0 0 44 44" aria-hidden="true">
-        <circle className="gauge-track" cx="22" cy="22" r={radius} />
+    <span className="relative block size-11">
+      <svg className="size-11" viewBox="0 0 44 44" aria-hidden="true">
+        <circle className="fill-none stroke-(--rule) stroke-[3.5]" cx="22" cy="22" r={radius} />
         <circle
-          className="gauge-fill"
+          className={`origin-center -rotate-90 fill-none transition-[stroke-dashoffset] duration-300 stroke-[3.5] ${
+            tier.key === 'very-high'
+              ? 'stroke-(--score-very-high)'
+              : tier.key === 'high'
+                ? 'stroke-(--score-high)'
+                : tier.key === 'medium'
+                  ? 'stroke-(--score-medium)'
+                  : 'stroke-(--score-moderate)'
+          }`}
           data-tier={tier.key}
           cx="22"
           cy="22"
@@ -205,7 +226,7 @@ function ScoreGauge({ score }: { score: number }) {
           strokeDashoffset={dashOffset.toFixed(2)}
         />
       </svg>
-      <span className="gauge-value">{safeScore}</span>
+      <span className="absolute inset-0 flex items-center justify-center text-[13px] font-bold tabular-nums text-(--ink-1)">{safeScore}</span>
     </span>
   );
 }
@@ -230,34 +251,69 @@ function OpportunityRow({ match }: { match: AnalysisMatch }) {
   return (
     <button
       type="button"
-      className="opportunity-item"
+      className="group grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_52px_16px] items-center gap-3 border-0 border-b border-(--rule) bg-(--paper) px-4 py-[15px] text-left text-inherit transition-colors duration-160 hover:bg-(--surface) focus-visible:bg-(--surface) disabled:cursor-default disabled:opacity-72"
       onClick={() => openMarket(match.marketUrl)}
       disabled={!match.marketUrl}
       aria-label={`打开盘口：${match.question || '未命名盘口'}`}
     >
-      <span className="row-body">
-        <span className="opportunity-question-row">
-          <span className="row-icon" data-tier={tier.key} aria-hidden="true">
+      <span className="flex min-w-0 flex-col gap-[5px]">
+        <span className="flex min-w-0 items-start gap-2">
+          <span
+            className={`mt-px inline-flex size-4 shrink-0 items-center justify-center [&_svg]:size-3.5 ${
+              tier.key === 'very-high'
+                ? 'text-(--score-very-high)'
+                : tier.key === 'high'
+                  ? 'text-(--score-high)'
+                  : tier.key === 'medium'
+                    ? 'text-(--score-medium)'
+                    : 'text-(--score-moderate)'
+            }`}
+            data-tier={tier.key}
+            aria-hidden="true"
+          >
             <svg viewBox="0 0 24 24">
               <path d="M22 7 13.5 15.5 9 11l-7 7" />
               <path d="M16 7h6v6" />
             </svg>
           </span>
-          <span className="opportunity-question">{match.question || '未命名盘口'}</span>
+          <span className="line-clamp-2 min-w-0 overflow-hidden text-[13px] font-semibold leading-[1.35] text-(--ink-1)">{match.question || '未命名盘口'}</span>
         </span>
-        <span className="row-source">Polymarket · #{match.marketId}</span>
-        <span className="opportunity-badges">
-          <span className={`badge badge-direction ${direction.tone}`}>{direction.label}</span>
+        <span className="text-[11px] tabular-nums text-(--ink-4)">Polymarket · #{match.marketId}</span>
+        <span className="flex flex-wrap gap-[5px]">
+          <span
+            className={`inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2) ${
+              direction.tone === 'yes'
+                ? 'border-[#a7f3d0] bg-(--good-soft) text-(--good)'
+                : direction.tone === 'no'
+                  ? 'border-[#fecdd3] bg-(--bad-soft) text-(--bad)'
+                  : ''
+            }`}
+          >
+            {direction.label}
+          </span>
         </span>
-        {match.reason ? <span className="opportunity-reason">{match.reason}</span> : null}
+        {match.reason ? <span className="line-clamp-2 overflow-hidden text-xs leading-[1.45] text-(--ink-3)">{match.reason}</span> : null}
       </span>
 
-      <span className="row-score">
+      <span className="flex flex-col items-center gap-0.5">
         <ScoreGauge score={score} />
-        <span className="score-label" data-tier={tier.key}>{tier.label}</span>
+        <span
+          className={`whitespace-nowrap text-[9px] font-bold uppercase ${
+            tier.key === 'very-high'
+              ? 'text-(--score-very-high)'
+              : tier.key === 'high'
+                ? 'text-(--score-high)'
+                : tier.key === 'medium'
+                  ? 'text-(--score-medium)'
+                  : 'text-(--score-moderate)'
+          }`}
+          data-tier={tier.key}
+        >
+          {tier.label}
+        </span>
       </span>
 
-      <span className="row-arrow" aria-hidden="true">
+      <span className="text-(--ink-4) transition-[color,transform] duration-160 group-hover:translate-x-0.5 group-hover:text-(--accent) group-focus-visible:translate-x-0.5 group-focus-visible:text-(--accent) [&_svg]:size-4" aria-hidden="true">
         <svg viewBox="0 0 24 24">
           <path d="m9 6 6 6-6 6" />
         </svg>
@@ -269,8 +325,19 @@ function OpportunityRow({ match }: { match: AnalysisMatch }) {
 // 空白状态
 function EmptyResult({ status, message }: { status: AnalysisStatus; message: string }) {
   return (
-    <article className={`result-card ${status}`}>
-      <span className="result-card-icon" aria-hidden="true">
+    <article className="flex min-h-[calc(100vh-146px)] flex-col items-center justify-center gap-3 px-[18px] py-8 text-center">
+      <span
+        className={`inline-flex size-12 items-center justify-center text-(--ink-4) [&_svg]:size-12 [&_circle]:fill-current [&_circle]:stroke-none ${
+          status === 'loading'
+            ? 'animate-[pulse_900ms_ease-in-out_infinite] text-(--accent)'
+            : status === 'error'
+              ? 'text-(--bad)'
+              : status === 'blocked'
+                ? 'text-(--amber)'
+                : ''
+        }`}
+        aria-hidden="true"
+      >
         <svg viewBox="0 0 24 24">
           <path d="M2 8.82a15 15 0 0 1 20 0" />
           <path d="M5 12.55a11 11 0 0 1 14.08 0" />
@@ -278,8 +345,8 @@ function EmptyResult({ status, message }: { status: AnalysisStatus; message: str
           <circle cx="12" cy="20" r="0.6" />
         </svg>
       </span>
-      <h2>{ANALYSIS_COPY[status]}</h2>
-      <p>{message}</p>
+      <h2 className={`m-0 text-[22px] font-[650] tracking-normal text-(--ink-1) ${status === 'error' ? 'text-(--bad)' : ''}`}>{ANALYSIS_COPY[status]}</h2>
+      <p className="m-0 max-w-[32ch] text-[13px] leading-[1.55] text-(--ink-3)">{message}</p>
     </article>
   );
 }
@@ -317,8 +384,8 @@ function ResultBoard({
   }
 
   return (
-    <section className="result-panel" aria-label="分析结果">
-      <div className="opportunity-list">
+    <section className="block" aria-label="分析结果">
+      <div className="block">
         {matches.map((match) => (
           <OpportunityRow key={match.marketId} match={match} />
         ))}
@@ -346,16 +413,16 @@ function FeedView({
   onAnalyze: () => void;
 }) {
   return (
-    <section id="view-feed" className="view is-active" role="tabpanel" aria-labelledby="tab-feed">
-      <header className="feed-header">
-        <div className="feed-title-block">
-          <p className="eyebrow">{EXTENSION_NAME}</p>
-          <h1>信号</h1>
-          <p className="page-title">{lastTitle || '尚未读取当前页面'}</p>
+    <section id="view-feed" role="tabpanel" aria-labelledby="tab-feed">
+      <header className="flex items-start justify-between gap-4 border-b border-(--rule) px-4 pb-4 pt-[18px]">
+        <div className="min-w-0">
+          <p className="m-0 mb-1.5 text-[11px] font-bold uppercase tracking-normal text-(--accent)">{EXTENSION_NAME}</p>
+          <h1 className="m-0 text-2xl font-[650] leading-[1.15] tracking-normal text-(--ink-1)">信号</h1>
+          <p className="mb-0 mt-2 line-clamp-2 max-w-[42ch] overflow-hidden text-[13px] leading-[1.4] text-(--ink-3)">{lastTitle || '尚未读取当前页面'}</p>
         </div>
         <button
           type="button"
-          className="btn btn-primary"
+          className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-transparent bg-(--ink-1) px-[13px] text-[13px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
           onClick={onAnalyze}
           disabled={analysisStatus === 'loading'}
         >
@@ -363,11 +430,11 @@ function FeedView({
         </button>
       </header>
 
-      <div className="status-strip" aria-label="运行状态">
+      <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-(--rule) px-4" aria-label="运行状态">
         <StatusPill label={STATUS_COPY[channelStatus]} tone={statusTone(channelStatus)} />
         <StatusPill label={ANALYSIS_COPY[analysisStatus]} tone={statusTone(analysisStatus)} />
         <StatusPill label={ghostEnabled ? '幽灵模式开' : '幽灵模式关'} tone={ghostEnabled ? 'success' : 'neutral'} />
-        <span className="status-summary">{summarizeAnalysis(result)}</span>
+        <span className="shrink-0 text-xs tabular-nums text-(--ink-3)">{summarizeAnalysis(result)}</span>
       </div>
 
       <ResultBoard status={analysisStatus} result={result} error={error} />
@@ -386,12 +453,12 @@ function ProfileView({
   onLogout: () => void;
 }) {
   return (
-    <section id="view-profile" className="view" role="tabpanel" aria-labelledby="tab-profile">
+    <section id="view-profile" role="tabpanel" aria-labelledby="tab-profile">
       <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
 
-      <div className="setting-row">
-        <span className="setting-label-text">会员状态</span>
-        <span className="badge">待迁移</span>
+      <div className="flex min-h-[60px] items-center justify-between gap-3 border-b border-(--rule) px-4">
+        <span className="text-sm font-semibold text-(--ink-1)">会员状态</span>
+        <span className="inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">待迁移</span>
       </div>
     </section>
   );
@@ -408,21 +475,22 @@ function SettingsView({
   onToggleGhost: (enabled: boolean) => void;
 }) {
   return (
-    <section id="view-settings" className="view" role="tabpanel" aria-labelledby="tab-settings">
-      <div className="setting-row">
-        <div className="setting-label-group">
-          <span className="setting-label-text">幽灵模式</span>
-          <span className="badge">{ghostEnabled ? '已开启' : '已关闭'}</span>
+    <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings">
+      <div className="flex min-h-[60px] items-center justify-between gap-3 border-b border-(--rule) px-4">
+        <div className="inline-flex min-w-0 items-center gap-2">
+          <span className="text-sm font-semibold text-(--ink-1)">幽灵模式</span>
+          <span className="inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">{ghostEnabled ? '已开启' : '已关闭'}</span>
         </div>
-        <label className="ghost-mode-toggle" aria-label="幽灵模式">
+        <label className="inline-flex min-h-11 cursor-pointer items-center" aria-label="幽灵模式">
           <input
+            className="peer sr-only"
             type="checkbox"
             checked={ghostEnabled}
             disabled={ghostBusy}
             onChange={(event) => onToggleGhost(event.currentTarget.checked)}
           />
-          <span className="ghost-mode-track" aria-hidden="true">
-            <span className="ghost-mode-thumb" />
+          <span className="relative h-5 w-[34px] rounded-full bg-(--rule-strong) transition-colors duration-160 peer-checked:bg-(--ink-1) peer-disabled:opacity-60 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--accent) peer-checked:[&>span]:translate-x-3.5" aria-hidden="true">
+            <span className="absolute left-[3px] top-[3px] size-3.5 rounded-full bg-(--paper) transition-transform duration-160 [box-shadow:0_1px_2px_rgb(17_24_39/18%)]" />
           </span>
         </label>
       </div>
@@ -697,20 +765,29 @@ export function App() {
   }
 
   return (
-    <main className="sidepanel-shell">
+    <main className="min-h-screen bg-(--paper) text-(--ink-1)">
       <nav
-        className="tab-bar"
+        className="sticky top-0 z-10 isolate mx-4 mb-2 mt-3 flex items-stretch gap-0 rounded-full border border-(--rule) bg-(--surface-strong) p-1"
         role="tablist"
         aria-label="主导航"
         data-active={getTabIndex(activeTab)}
       >
-        <span className="tab-bar-indicator" aria-hidden="true" />
+        <span
+          className={`pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-8px)/3)] rounded-full bg-(--paper) transition-transform duration-220 ease-in-out [box-shadow:0_1px_2px_rgb(17_24_39/10%)] ${
+            activeTab === 'profile'
+              ? 'translate-x-full'
+              : activeTab === 'settings'
+                ? 'translate-x-[200%]'
+                : 'translate-x-0'
+          }`}
+          aria-hidden="true"
+        />
         {SIDE_PANEL_TABS.map((tab) => (
           <TabButton key={tab.key} tab={tab} activeTab={activeTab} onSelect={setActiveTab} />
         ))}
       </nav>
 
-      <div className="views">
+      <div>
         <div hidden={activeTab !== 'feed'}>
           <FeedView
             channelStatus={channelStatus}
