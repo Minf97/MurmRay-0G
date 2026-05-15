@@ -213,3 +213,130 @@ test('membership controller bypasses quota when setup is missing', async () => {
   assert.equal(status.bypassed, true);
   assert.equal(status.planCode, 'free');
 });
+
+test('membership controller creates and confirms membership orders', async () => {
+  const mock = createBrowserMock({ [AUTH_TOKEN_STORAGE_KEY]: 'access-1' });
+  const calls = [];
+  const controller = createMembershipController({
+    browser: mock.browser,
+    getAuthUser: async () => ({ user: { id: 'user-1', email: 'ada@example.com', profile: { name: 'Ada' } } }),
+    createMembershipClient: (token) => ({
+      database: {
+        async rpc(fn, args) {
+          calls.push({ kind: 'rpc', fn, args, token });
+          if (fn === 'murmray_get_pricing_catalog') {
+            return {
+              data: [
+                {
+                  product_type: 'membership',
+                  code: 'premium',
+                  name: 'Pro',
+                  daily_quota: null,
+                  price_amount: '5',
+                  purchasable: true,
+                  is_active: true,
+                },
+              ],
+            };
+          }
+
+          return {
+            data: [{
+              order_id: args.p_order_id,
+              plan_code: 'premium',
+              tx_hash: args.p_tx_hash,
+              status: 'paid',
+            }],
+          };
+        },
+        from(table) {
+          return {
+            insert(rows) {
+              calls.push({ kind: 'insert', table, rows, token });
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return { data: { id: 'order-1' } };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      },
+    }),
+  });
+
+  const order = await controller.createMembershipOrder('premium');
+  assert.equal(order.orderId, 'order-1');
+  assert.equal(order.productType, 'membership');
+  assert.equal(order.paymentRequired, true);
+  assert.equal(order.paymentAmountHex, '0x4c4b40');
+  assert.equal(calls.find((call) => call.kind === 'insert').rows[0].user_id, 'user-1');
+
+  const confirmation = await controller.confirmMembershipOrder({
+    orderId: order.orderId,
+    txHash: '0xabc',
+    senderAddress: '0x1111111111111111111111111111111111111111',
+    chainId: 196,
+  });
+
+  assert.equal(confirmation.orderId, 'order-1');
+  assert.equal(confirmation.txHash, '0xabc');
+  assert.equal(calls.at(-1).fn, 'murmray_activate_membership_order');
+});
+
+test('membership controller creates usage pack orders', async () => {
+  const mock = createBrowserMock({ [AUTH_TOKEN_STORAGE_KEY]: 'access-1' });
+  const inserts = [];
+  const controller = createMembershipController({
+    browser: mock.browser,
+    getAuthUser: async () => ({ user: { id: 'user-1', email: 'ada@example.com', profile: { name: 'Ada' } } }),
+    createMembershipClient: () => ({
+      database: {
+        async rpc(fn) {
+          assert.equal(fn, 'murmray_get_pricing_catalog');
+          return {
+            data: [
+              {
+                product_type: 'usage_pack',
+                code: 'credit_pack_20',
+                name: '20 Pack',
+                credit_count: 20,
+                price_amount: '0.1',
+                purchasable: true,
+                is_active: true,
+              },
+            ],
+          };
+        },
+        from(table) {
+          return {
+            insert(rows) {
+              inserts.push({ table, rows });
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return { data: { id: 'usage-order-1' } };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        },
+      },
+    }),
+  });
+
+  const order = await controller.createUsagePackOrder('credit_pack_20');
+  assert.equal(order.orderId, 'usage-order-1');
+  assert.equal(order.productType, 'usage_pack');
+  assert.equal(order.creditCount, 20);
+  assert.equal(order.paymentAmountHex, '0x186a0');
+  assert.equal(inserts[0].table, 'murmray_usage_credit_orders');
+  assert.equal(inserts[0].rows[0].credit_count, 20);
+});

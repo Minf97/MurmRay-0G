@@ -39,6 +39,14 @@ export const AUTH_MESSAGE_TYPES = Object.freeze({
 export const MEMBERSHIP_MESSAGE_TYPES = Object.freeze({
   getStatus: 'membership:get_status',
   getCatalog: 'membership:get_catalog',
+  createOrder: 'membership:create_order',
+  confirmOrder: 'membership:confirm_order',
+} as const);
+
+// 次卡消息
+export const USAGE_PACK_MESSAGE_TYPES = Object.freeze({
+  createOrder: 'usage_pack:create_order',
+  confirmOrder: 'usage_pack:confirm_order',
 } as const);
 
 // 钱包消息
@@ -46,6 +54,7 @@ export const WALLET_MESSAGE_TYPES = Object.freeze({
   getState: 'wallet:get_state',
   connect: 'wallet:connect',
   switchXLayer: 'wallet:switch_xlayer',
+  sendPayment: 'wallet:send_payment',
 } as const);
 
 // 持仓消息
@@ -59,10 +68,11 @@ export type AnalysisMessageType = typeof ANALYSIS_MESSAGE_TYPES[keyof typeof ANA
 export type GhostMessageType = typeof GHOST_MESSAGE_TYPES[keyof typeof GHOST_MESSAGE_TYPES];
 export type AuthMessageType = typeof AUTH_MESSAGE_TYPES[keyof typeof AUTH_MESSAGE_TYPES];
 export type MembershipMessageType = typeof MEMBERSHIP_MESSAGE_TYPES[keyof typeof MEMBERSHIP_MESSAGE_TYPES];
+export type UsagePackMessageType = typeof USAGE_PACK_MESSAGE_TYPES[keyof typeof USAGE_PACK_MESSAGE_TYPES];
 export type WalletMessageType = typeof WALLET_MESSAGE_TYPES[keyof typeof WALLET_MESSAGE_TYPES];
 export type PolymarketMessageType = typeof POLYMARKET_MESSAGE_TYPES[keyof typeof POLYMARKET_MESSAGE_TYPES];
 
-type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType | WalletMessageType | PolymarketMessageType;
+type KnownMessageType = CoreMessageType | PageMessageType | AnalysisMessageType | GhostMessageType | AuthMessageType | MembershipMessageType | UsagePackMessageType | WalletMessageType | PolymarketMessageType;
 
 const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(CORE_MESSAGE_TYPES),
@@ -71,6 +81,7 @@ const KNOWN_MESSAGE_TYPE_SET = new Set<KnownMessageType>([
   ...Object.values(GHOST_MESSAGE_TYPES),
   ...Object.values(AUTH_MESSAGE_TYPES),
   ...Object.values(MEMBERSHIP_MESSAGE_TYPES),
+  ...Object.values(USAGE_PACK_MESSAGE_TYPES),
   ...Object.values(WALLET_MESSAGE_TYPES),
   ...Object.values(POLYMARKET_MESSAGE_TYPES),
 ]);

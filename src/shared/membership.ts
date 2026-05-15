@@ -1,5 +1,78 @@
+import { getXLayerNetwork } from './chains';
+
 export const DEFAULT_FREE_DAILY_QUOTA = 1000;
 export const DEFAULT_USAGE_PACK_CREDITS = 20;
+export const MURMRAY_PAYMENT_NETWORK_MODE = 'mainnet';
+
+const activeXLayerNetwork = getXLayerNetwork(MURMRAY_PAYMENT_NETWORK_MODE);
+
+const XLAYER_PAYMENT_TOKENS = {
+  mainnet: {
+    type: 'erc20',
+    name: 'USDt0',
+    symbol: 'USDT0',
+    decimals: 6,
+    address: '0x779Ded0c9e1022225f8E0630b35a9b54bE713736',
+  },
+} as const;
+
+const activePaymentToken = XLAYER_PAYMENT_TOKENS[MURMRAY_PAYMENT_NETWORK_MODE];
+
+export const MURMRAY_PAYMENT_CONFIG = {
+  networkMode: MURMRAY_PAYMENT_NETWORK_MODE,
+  recipientAddress: '0xcE39698C17cC53734E86704dfD2F061B318f8B50',
+  treasuryAddress: '0x953fdc110a67b1381621ac02c449b8d36681e5f6',
+  recipientLabel: 'MurmRay',
+  chainId: activeXLayerNetwork.id,
+  chainHexId: activeXLayerNetwork.chainId,
+  chainName: activeXLayerNetwork.chainName,
+  symbol: activeXLayerNetwork.nativeCurrency.symbol,
+  nativeCurrency: activeXLayerNetwork.nativeCurrency,
+  rpcUrls: activeXLayerNetwork.rpcUrls,
+  blockExplorerUrls: activeXLayerNetwork.blockExplorerUrls,
+  txExplorerBaseUrl: activeXLayerNetwork.txExplorerBaseUrl,
+  paymentType: activePaymentToken?.type || 'native',
+  paymentSymbol: activePaymentToken?.symbol || activeXLayerNetwork.nativeCurrency.symbol,
+  paymentTokenName: activePaymentToken?.name || activeXLayerNetwork.nativeCurrency.name,
+  paymentDecimals: activePaymentToken?.decimals ?? activeXLayerNetwork.nativeCurrency.decimals,
+  paymentTokenAddress: activePaymentToken?.address || '',
+  setupHint: activePaymentToken ? '功能配置未完成' : '功能暂不可用',
+} as const;
+
+// 净化订单段
+function sanitizePaymentReferencePart(value: unknown, fallback: string) {
+  const normalized = String(value || '')
+    .trim()
+    .replace(/[|\n\r\t]+/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  return normalized || fallback;
+}
+
+// 构建链上单号
+export function buildChainPaymentOrderId({
+  orderId,
+  productType,
+  itemName,
+  amount,
+  symbol,
+}: {
+  orderId: unknown;
+  productType: unknown;
+  itemName: unknown;
+  amount: unknown;
+  symbol: unknown;
+}) {
+  const safeProductType = sanitizePaymentReferencePart(productType, 'payment');
+  const safeItemName = sanitizePaymentReferencePart(itemName, 'item');
+  const safeOrderId = sanitizePaymentReferencePart(orderId, 'unknown-order');
+  const safeAmount = sanitizePaymentReferencePart(
+    amount && symbol ? `${amount} ${symbol}` : amount,
+    symbol ? `0 ${symbol}` : '0',
+  );
+
+  return `${safeProductType}|${safeItemName}|${safeAmount}|${safeOrderId}`;
+}
 
 export type MembershipPlan = {
   productType: 'membership';
@@ -52,6 +125,43 @@ export type MembershipStatus = {
   setupRequired: boolean;
   requiresLogin?: boolean;
   bypassed?: boolean;
+};
+
+export type PaymentOrder = {
+  orderId: string;
+  productType: 'membership' | 'usage_pack';
+  planCode?: string;
+  planName?: string;
+  packCode?: string;
+  packName?: string;
+  itemName: string;
+  creditCount?: number;
+  recipientAddress: string;
+  amount: string;
+  amountNative: string;
+  amountBaseUnits: string;
+  paymentAmountHex: string;
+  paymentType: string;
+  paymentSymbol: string;
+  paymentTokenAddress: string | null;
+  paymentTokenDecimals: number;
+  valueHex: string;
+  chainId: number;
+  chainHexId: string;
+  zeroPrice: boolean;
+  paymentRequired: boolean;
+};
+
+export type PaymentConfirmation = {
+  orderId: string;
+  productType: 'membership' | 'usage_pack';
+  planCode?: string;
+  packCode?: string;
+  dailyQuota?: number | null;
+  creditCount?: number;
+  remainingCredits?: number;
+  txHash: string;
+  status: string;
 };
 
 export const MURMRAY_MEMBERSHIP_PLANS: MembershipPlan[] = [
@@ -178,6 +288,18 @@ export function getUsagePack(packCode: unknown, packs = MURMRAY_USAGE_PACKS) {
   const source = Array.isArray(packs) && packs.length ? packs : MURMRAY_USAGE_PACKS;
   const code = normalizeText(packCode, '');
   return source.find((pack) => pack.code === code) || source[0] || null;
+}
+
+// 取价格值
+export function getItemPriceAmount(item: unknown) {
+  const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+  return String(record.priceAmount ?? record.price_amount ?? record.priceNative ?? '').trim();
+}
+
+// 判断零价
+export function isZeroPricedItem(item: unknown) {
+  const priceAmount = getItemPriceAmount(item);
+  return /^\d+(\.\d+)?$/.test(priceAmount) && Number(priceAmount) === 0;
 }
 
 // 建会员行
@@ -335,3 +457,67 @@ export function getQuotaLabel(dailyQuota: number | null | undefined) {
   if (dailyQuota == null) return '不限次数 / 日';
   return `${Math.max(0, Math.trunc(Number(dailyQuota) || 0))} 次 / 日`;
 }
+
+// 次卡文案
+export function getUsagePackLabel(creditCount: unknown) {
+  return `${Math.max(0, Math.trunc(Number(creditCount) || 0))} 次额度`;
+}
+
+// 价格文案
+export function getPlanPriceLabel(item: unknown) {
+  const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+  if (!record.purchasable || isZeroPricedItem(item)) return '免费';
+
+  const priceAmount = getItemPriceAmount(item);
+  if (!priceAmount) return '价格待填写';
+  return `${priceAmount} ${MURMRAY_PAYMENT_CONFIG.paymentSymbol}`;
+}
+
+// 支付可用
+export function isPaymentConfigReady(item: unknown) {
+  const record = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+  if (!record.purchasable) return false;
+  if (isZeroPricedItem(item)) return true;
+
+  const hasToken = MURMRAY_PAYMENT_CONFIG.paymentType !== 'erc20'
+    || Boolean(String(MURMRAY_PAYMENT_CONFIG.paymentTokenAddress || '').trim());
+
+  return Boolean(
+    String(MURMRAY_PAYMENT_CONFIG.recipientAddress || '').trim()
+    && getItemPriceAmount(item)
+    && hasToken
+  );
+}
+
+// 金额转基数
+export function paymentAmountToBaseUnits(amount: unknown, decimals = MURMRAY_PAYMENT_CONFIG.paymentDecimals) {
+  const normalized = String(amount || '').trim();
+
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error('请输入合法金额，例如 0.1');
+  }
+
+  const [wholePart, fractionPart = ''] = normalized.split('.');
+  if (fractionPart.length > decimals) {
+    throw new Error(`最多支持 ${decimals} 位小数`);
+  }
+
+  const base = 10n ** BigInt(decimals);
+  const wholeUnits = BigInt(wholePart || '0') * base;
+  const fractionUnits = BigInt((fractionPart + '0'.repeat(decimals)).slice(0, decimals) || '0');
+  const totalUnits = wholeUnits + fractionUnits;
+
+  if (totalUnits <= 0n) {
+    throw new Error('金额必须大于 0');
+  }
+
+  return totalUnits.toString();
+}
+
+// 金额转十六
+export function paymentAmountToHexUnits(amount: unknown, decimals = MURMRAY_PAYMENT_CONFIG.paymentDecimals) {
+  return `0x${BigInt(paymentAmountToBaseUnits(amount, decimals)).toString(16)}`;
+}
+
+export const nativeAmountToBaseUnits = paymentAmountToBaseUnits;
+export const nativeAmountToHexUnits = paymentAmountToHexUnits;

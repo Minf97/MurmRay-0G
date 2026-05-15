@@ -2,10 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_FREE_DAILY_QUOTA,
+  MURMRAY_PAYMENT_CONFIG,
   createDefaultPricingCatalog,
   createFreeMembershipStatus,
+  buildChainPaymentOrderId,
   getMembershipPlan,
+  getPlanPriceLabel,
   getQuotaLabel,
+  isPaymentConfigReady,
+  paymentAmountToBaseUnits,
+  paymentAmountToHexUnits,
   normalizeMembershipStatus,
   normalizePricingCatalogRows,
 } from '../../src/shared/membership';
@@ -68,4 +74,24 @@ test('membership copy formats free quota', () => {
   assert.equal(createFreeMembershipStatus().remainingToday, DEFAULT_FREE_DAILY_QUOTA);
   assert.equal(getQuotaLabel(null), '不限次数 / 日');
   assert.equal(getQuotaLabel(1000), '1000 次 / 日');
+});
+
+test('membership payment helpers format x layer prices', () => {
+  const catalog = createDefaultPricingCatalog();
+  const plan = getMembershipPlan('premium', catalog.membershipPlans);
+
+  assert.equal(getPlanPriceLabel(plan), `5 ${MURMRAY_PAYMENT_CONFIG.paymentSymbol}`);
+  assert.equal(isPaymentConfigReady(plan), true);
+  assert.equal(paymentAmountToBaseUnits('0.1', 6), '100000');
+  assert.equal(paymentAmountToHexUnits('0.1', 6), '0x186a0');
+  assert.equal(
+    buildChainPaymentOrderId({
+      productType: 'membership',
+      itemName: 'Pro|Plan',
+      amount: '5',
+      symbol: 'USDT0',
+      orderId: ' order\n1 ',
+    }),
+    'membership|Pro Plan|5 USDT0|order 1',
+  );
 });

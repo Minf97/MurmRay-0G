@@ -8,6 +8,7 @@ import {
   GHOST_MESSAGE_TYPES,
   MEMBERSHIP_MESSAGE_TYPES,
   POLYMARKET_MESSAGE_TYPES,
+  USAGE_PACK_MESSAGE_TYPES,
   WALLET_MESSAGE_TYPES,
   isKnownMessageType,
   isCoreMessageType,
@@ -52,12 +53,20 @@ test('message constants expose app channels', () => {
   assert.deepEqual(MEMBERSHIP_MESSAGE_TYPES, {
     getStatus: 'membership:get_status',
     getCatalog: 'membership:get_catalog',
+    createOrder: 'membership:create_order',
+    confirmOrder: 'membership:confirm_order',
+  });
+
+  assert.deepEqual(USAGE_PACK_MESSAGE_TYPES, {
+    createOrder: 'usage_pack:create_order',
+    confirmOrder: 'usage_pack:confirm_order',
   });
 
   assert.deepEqual(WALLET_MESSAGE_TYPES, {
     getState: 'wallet:get_state',
     connect: 'wallet:connect',
     switchXLayer: 'wallet:switch_xlayer',
+    sendPayment: 'wallet:send_payment',
   });
 
   assert.deepEqual(POLYMARKET_MESSAGE_TYPES, {
@@ -83,8 +92,9 @@ test('isKnownMessageType validates all values', () => {
   assert.equal(isKnownMessageType(ANALYSIS_MESSAGE_TYPES.analyzePage), true);
   assert.equal(isKnownMessageType(GHOST_MESSAGE_TYPES.stateUpdated), true);
   assert.equal(isKnownMessageType(AUTH_MESSAGE_TYPES.stateChanged), true);
-  assert.equal(isKnownMessageType(MEMBERSHIP_MESSAGE_TYPES.getStatus), true);
-  assert.equal(isKnownMessageType(WALLET_MESSAGE_TYPES.switchXLayer), true);
+  assert.equal(isKnownMessageType(MEMBERSHIP_MESSAGE_TYPES.createOrder), true);
+  assert.equal(isKnownMessageType(USAGE_PACK_MESSAGE_TYPES.confirmOrder), true);
+  assert.equal(isKnownMessageType(WALLET_MESSAGE_TYPES.sendPayment), true);
   assert.equal(isKnownMessageType(POLYMARKET_MESSAGE_TYPES.getPortfolio), true);
   assert.equal(isKnownMessageType('unknown:type'), false);
 });

@@ -5,7 +5,7 @@ import {
   SHOW_WALLET_SURFACE,
 } from '../../src/shared/feature-flags';
 
-test('temporary wallet and payment surfaces stay hidden', () => {
-  assert.equal(SHOW_WALLET_SURFACE, false);
-  assert.equal(SHOW_PAYMENT_SURFACE, false);
+test('wallet and payment surfaces are enabled for main parity', () => {
+  assert.equal(SHOW_WALLET_SURFACE, true);
+  assert.equal(SHOW_PAYMENT_SURFACE, true);
 });

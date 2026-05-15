@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
 import { POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY } from '../../src/shared/config';
-import { SHOW_WALLET_SURFACE } from '../../src/shared/feature-flags';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
+import { SHOW_PAYMENT_SURFACE, SHOW_WALLET_SURFACE } from '../../src/shared/feature-flags';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, USAGE_PACK_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
 import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
@@ -14,6 +14,24 @@ import {
   normalizeEvmAddress,
   type PortfolioSnapshot,
 } from '../../src/shared/portfolio';
+import {
+  buildChainPaymentOrderId,
+  createDefaultPricingCatalog,
+  getItemPriceAmount,
+  getMembershipPlan,
+  getPlanPriceLabel,
+  getQuotaLabel,
+  getUsagePackLabel,
+  isPaymentConfigReady,
+  isZeroPricedItem,
+  MURMRAY_PAYMENT_CONFIG,
+  type MembershipPlan,
+  type MembershipStatus,
+  type PaymentConfirmation,
+  type PaymentOrder,
+  type PricingCatalog,
+  type UsagePack,
+} from '../../src/shared/membership';
 import {
   normalizeWalletProviderKey,
   shortenWalletAddress,
@@ -159,6 +177,28 @@ function formatDateTime(value: unknown) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+// 日期文案
+function formatDateShort(value: unknown) {
+  const date = new Date(String(value || ''));
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+// 解析链ID
+function parseChainId(chainId: unknown) {
+  if (typeof chainId === 'number') return chainId;
+  if (typeof chainId === 'string' && chainId.trim()) {
+    if (chainId.startsWith('0x')) return Number.parseInt(chainId, 16);
+    const numeric = Number(chainId);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+  return null;
 }
 
 // 渲染图标
@@ -607,6 +647,271 @@ function WalletStatusBlock({
   );
 }
 
+type PurchaseFeedback = {
+  tone: 'success' | 'error' | 'info';
+  title: string;
+  detail: string;
+  txHash?: string;
+} | null;
+
+// 钱包提示
+function billingWalletText(walletState: WalletState | null) {
+  if (!walletState?.hasProvider) return '未检测到钱包';
+  if (!walletState.connected) return `${walletState.walletLabel} · 未连接`;
+  return `${walletState.walletLabel} · ${shortenWalletAddress(walletState.account) || '已连接'} · ${getChainDisplay(walletState.chainId).name}`;
+}
+
+// 会员摘要
+function MembershipSummaryBlock({
+  status,
+  catalog,
+  onRefresh,
+}: {
+  status: MembershipStatus | null;
+  catalog: PricingCatalog;
+  onRefresh: () => void;
+}) {
+  const freePlan = getMembershipPlan('free', catalog.membershipPlans);
+  const headline = status?.unlimited ? '不限分析' : '免费使用';
+  const meta = status?.expiresAt
+    ? `有效期至 ${formatDateShort(status.expiresAt)}`
+    : `每日 ${freePlan?.dailyQuota ?? status?.dailyQuota ?? 1000} 次免费`;
+
+  return (
+    <div className="border-b border-(--rule) px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <span className="inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">
+            {status?.planName || '普通用户'}
+          </span>
+          <strong className="mt-2 block text-lg font-[650] leading-tight text-(--ink-1)">{headline}</strong>
+          <span className="mt-1 block text-[11px] leading-[1.45] text-(--ink-3)">{meta}</span>
+        </div>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface)"
+          onClick={onRefresh}
+        >
+          刷新
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">今日剩余</span>
+          <strong className="mt-1 block text-sm text-(--ink-1)">{status?.unlimited ? '不限' : Math.max(0, Number(status?.remainingToday || 0))}</strong>
+        </div>
+        <div className="rounded-lg border border-(--rule) bg-(--surface) px-2.5 py-2">
+          <span className="block text-[10px] font-semibold text-(--ink-4)">额外额度</span>
+          <strong className="mt-1 block text-sm text-(--ink-1)">{Math.max(0, Number(status?.extraCredits || 0))}</strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 购买反馈
+function PurchaseFeedbackBlock({ feedback }: { feedback: PurchaseFeedback }) {
+  if (!feedback) return null;
+
+  const toneClass = feedback.tone === 'success'
+    ? 'border-[#a7f3d0] bg-(--good-soft) text-(--good)'
+    : feedback.tone === 'error'
+      ? 'border-[#fecdd3] bg-(--bad-soft) text-(--bad)'
+      : 'border-(--rule) bg-(--surface) text-(--ink-2)';
+  const txUrl = feedback.txHash ? `${MURMRAY_PAYMENT_CONFIG.txExplorerBaseUrl}${feedback.txHash}` : '';
+
+  return (
+    <div className={`mx-4 mt-3 rounded-lg border px-3 py-2 ${toneClass}`}>
+      <strong className="block text-xs">{feedback.title}</strong>
+      <span className="mt-1 block break-words text-[11px] leading-[1.45]">{feedback.detail}</span>
+      {txUrl ? (
+        <button
+          type="button"
+          className="mt-2 border-0 bg-transparent p-0 text-[11px] font-semibold underline"
+          onClick={() => openMarket(txUrl)}
+        >
+          查看交易
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// 会员卡片
+function PlanCard({
+  plan,
+  currentPlanCode,
+  busyKey,
+  onPurchase,
+}: {
+  plan: MembershipPlan;
+  currentPlanCode: string;
+  busyKey: string;
+  onPurchase: (productType: 'membership', code: string) => void;
+}) {
+  const isCurrent = currentPlanCode === plan.code;
+  const paymentReady = isPaymentConfigReady(plan);
+  const disabled = !plan.purchasable || isCurrent || !paymentReady || busyKey === `membership:${plan.code}`;
+
+  return (
+    <article className={`rounded-lg border px-3 py-3 ${plan.featured ? 'border-(--ink-2) bg-(--surface)' : 'border-(--rule) bg-(--paper)'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <strong className="block text-sm text-(--ink-1)">{plan.name}</strong>
+          <span className="mt-1 block text-[11px] leading-[1.45] text-(--ink-3)">{plan.description}</span>
+        </div>
+        <span className="shrink-0 text-xs font-bold text-(--ink-1)">{getPlanPriceLabel(plan)}</span>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold text-(--ink-3)">{getQuotaLabel(plan.dailyQuota)}</span>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-(--ink-1) px-2.5 text-[11px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-default disabled:bg-(--ink-4)"
+          onClick={() => onPurchase('membership', plan.code)}
+          disabled={disabled}
+        >
+          {busyKey === `membership:${plan.code}` ? '处理中' : isCurrent ? '当前' : paymentReady ? plan.ctaLabel : '暂不可用'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// 次卡卡片
+function UsagePackCard({
+  pack,
+  busyKey,
+  onPurchase,
+}: {
+  pack: UsagePack;
+  busyKey: string;
+  onPurchase: (productType: 'usage_pack', code: string) => void;
+}) {
+  const paymentReady = isPaymentConfigReady(pack);
+  const disabled = !pack.purchasable || !paymentReady || busyKey === `usage_pack:${pack.code}`;
+
+  return (
+    <article className="rounded-lg border border-(--rule) bg-(--paper) px-3 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <strong className="block text-sm text-(--ink-1)">{pack.name}</strong>
+          <span className="mt-1 block text-[11px] leading-[1.45] text-(--ink-3)">{pack.description}</span>
+        </div>
+        <span className="shrink-0 text-xs font-bold text-(--ink-1)">{getPlanPriceLabel(pack)}</span>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-semibold text-(--ink-3)">{getUsagePackLabel(pack.creditCount)}</span>
+        <button
+          type="button"
+          className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-default disabled:text-(--ink-4)"
+          onClick={() => onPurchase('usage_pack', pack.code)}
+          disabled={disabled}
+        >
+          {busyKey === `usage_pack:${pack.code}` ? '处理中' : paymentReady ? pack.ctaLabel : '暂不可用'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+// 购买中心
+function MembershipBillingBlock({
+  status,
+  catalog,
+  walletState,
+  walletBusy,
+  walletProviderKey,
+  busyKey,
+  feedback,
+  onRefreshStatus,
+  onWalletConnect,
+  onWalletSwitchXLayer,
+  onPurchase,
+}: {
+  status: MembershipStatus | null;
+  catalog: PricingCatalog;
+  walletState: WalletState | null;
+  walletBusy: boolean;
+  walletProviderKey: WalletProviderKey;
+  busyKey: string;
+  feedback: PurchaseFeedback;
+  onRefreshStatus: () => void;
+  onWalletConnect: () => void;
+  onWalletSwitchXLayer: () => void;
+  onPurchase: (productType: 'membership' | 'usage_pack', code: string) => void;
+}) {
+  const plans = catalog.membershipPlans.filter((plan) => plan.isActive);
+  const packs = catalog.usagePacks.filter((pack) => pack.isActive);
+  const onTargetChain = isXLayerChain(walletState?.chainId);
+
+  return (
+    <div className="border-b border-(--rule) pb-3">
+      <MembershipSummaryBlock status={status} catalog={catalog} onRefresh={onRefreshStatus} />
+      <div className="border-b border-(--rule) px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className="block text-sm font-semibold text-(--ink-1)">链上支付</span>
+            <span className="mt-0.5 block text-[11px] leading-[1.45] text-(--ink-3)">
+              {walletProviderKey === 'auto' ? '自动钱包' : walletProviderKey} · {billingWalletText(walletState)}
+            </span>
+          </div>
+          <span className="inline-flex min-h-[22px] shrink-0 items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">
+            {MURMRAY_PAYMENT_CONFIG.paymentSymbol}
+          </span>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-(--rule) bg-(--paper) px-2.5 text-[11px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) disabled:cursor-progress disabled:text-(--ink-4)"
+            onClick={onWalletConnect}
+            disabled={walletBusy}
+          >
+            连接钱包
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-8 cursor-pointer items-center justify-center rounded-lg border border-transparent bg-(--ink-1) px-2.5 text-[11px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
+            onClick={onWalletSwitchXLayer}
+            disabled={walletBusy || onTargetChain}
+          >
+            {onTargetChain ? '已在 X Layer' : '切换 X Layer'}
+          </button>
+        </div>
+      </div>
+
+      <PurchaseFeedbackBlock feedback={feedback} />
+
+      <div className="px-4 pt-3">
+        <h2 className="m-0 text-sm font-semibold text-(--ink-1)">会员权益</h2>
+        <div className="mt-2 grid gap-2">
+          {plans.map((plan) => (
+            <PlanCard
+              key={plan.code}
+              plan={plan}
+              currentPlanCode={status?.planCode || 'free'}
+              busyKey={busyKey}
+              onPurchase={onPurchase}
+            />
+          ))}
+        </div>
+
+        <h2 className="m-0 mt-4 text-sm font-semibold text-(--ink-1)">补充额度</h2>
+        <div className="mt-2 grid gap-2">
+          {packs.map((pack) => (
+            <UsagePackCard
+              key={pack.code}
+              pack={pack}
+              busyKey={busyKey}
+              onPurchase={onPurchase}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // 来源标签
 function portfolioSourceLabel(snapshot: PortfolioSnapshot | null, walletLookupEnabled = SHOW_WALLET_SURFACE) {
   if (snapshot?.source === 'manual') return '手动地址';
@@ -755,6 +1060,10 @@ function PortfolioBlock({
 // 我的视图
 function ProfileView({
   user,
+  membershipStatus,
+  pricingCatalog,
+  purchaseBusyKey,
+  purchaseFeedback,
   walletState,
   walletProviderKey,
   walletBusy,
@@ -764,6 +1073,8 @@ function ProfileView({
   portfolioBusy,
   portfolioError,
   logoutBusy,
+  onRefreshMembership,
+  onPurchase,
   onWalletProviderChange,
   onWalletRefresh,
   onWalletConnect,
@@ -775,6 +1086,10 @@ function ProfileView({
   onLogout,
 }: {
   user: AuthUser;
+  membershipStatus: MembershipStatus | null;
+  pricingCatalog: PricingCatalog;
+  purchaseBusyKey: string;
+  purchaseFeedback: PurchaseFeedback;
   walletState: WalletState | null;
   walletProviderKey: WalletProviderKey;
   walletBusy: boolean;
@@ -784,6 +1099,8 @@ function ProfileView({
   portfolioBusy: boolean;
   portfolioError: string;
   logoutBusy: boolean;
+  onRefreshMembership: () => void;
+  onPurchase: (productType: 'membership' | 'usage_pack', code: string) => void;
   onWalletProviderChange: (providerKey: WalletProviderKey) => void;
   onWalletRefresh: () => void;
   onWalletConnect: () => void;
@@ -797,6 +1114,21 @@ function ProfileView({
   return (
     <section id="view-profile" role="tabpanel" aria-labelledby="tab-profile">
       <UserProfile user={user} logoutBusy={logoutBusy} onLogout={onLogout} />
+      {SHOW_PAYMENT_SURFACE ? (
+        <MembershipBillingBlock
+          status={membershipStatus}
+          catalog={pricingCatalog}
+          walletState={walletState}
+          walletBusy={walletBusy}
+          walletProviderKey={walletProviderKey}
+          busyKey={purchaseBusyKey}
+          feedback={purchaseFeedback}
+          onRefreshStatus={onRefreshMembership}
+          onWalletConnect={onWalletConnect}
+          onWalletSwitchXLayer={onWalletSwitchXLayer}
+          onPurchase={onPurchase}
+        />
+      ) : null}
       {SHOW_WALLET_SURFACE ? (
         <WalletStatusBlock
           walletState={walletState}
@@ -878,6 +1210,10 @@ export function App() {
   const [walletState, setWalletState] = useState<WalletState | null>(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletError, setWalletError] = useState('');
+  const [pricingCatalog, setPricingCatalog] = useState<PricingCatalog>(() => createDefaultPricingCatalog());
+  const [membershipStatus, setMembershipStatus] = useState<MembershipStatus | null>(null);
+  const [purchaseBusyKey, setPurchaseBusyKey] = useState('');
+  const [purchaseFeedback, setPurchaseFeedback] = useState<PurchaseFeedback>(null);
   const [portfolioSnapshot, setPortfolioSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [portfolioAddressInput, setPortfolioAddressInput] = useState('');
   const [portfolioBusy, setPortfolioBusy] = useState(false);
@@ -936,10 +1272,42 @@ export function App() {
 
     if (response?.ok && response.data?.user) {
       applyAuthUser(response.data.user as AuthUser);
+      void refreshMembershipStatus({ silent: true, forceCatalog: true });
       return;
     }
 
     applyAuthUser(null);
+  }
+
+  // 读取权益
+  async function refreshMembershipStatus(options: { silent?: boolean; forceCatalog?: boolean } = {}) {
+    if (!options.silent) setPurchaseFeedback(null);
+
+    const [catalogResponse, statusResponse] = await Promise.all([
+      browser.runtime
+        .sendMessage({ type: MEMBERSHIP_MESSAGE_TYPES.getCatalog, force: Boolean(options.forceCatalog) })
+        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) })),
+      browser.runtime
+        .sendMessage({ type: MEMBERSHIP_MESSAGE_TYPES.getStatus })
+        .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) })),
+    ]);
+
+    if (catalogResponse?.ok && catalogResponse.data) {
+      setPricingCatalog(catalogResponse.data as PricingCatalog);
+    }
+
+    if (statusResponse?.ok && statusResponse.data) {
+      setMembershipStatus(statusResponse.data as MembershipStatus);
+      return;
+    }
+
+    if (!options.silent) {
+      setPurchaseFeedback({
+        tone: 'error',
+        title: '权益读取失败',
+        detail: statusResponse?.error || '无法读取会员状态',
+      });
+    }
   }
 
   useEffect(() => {
@@ -966,6 +1334,7 @@ export function App() {
       .catch(() => undefined);
 
     void refreshAuthUser();
+    void refreshMembershipStatus({ silent: true });
     void refreshGhostStateForActiveTab();
     if (SHOW_WALLET_SURFACE) void refreshWalletState({ silent: true });
     void loadPortfolioAddressPreference();
@@ -977,6 +1346,7 @@ export function App() {
 
       if (typedMessage.type === AUTH_MESSAGE_TYPES.stateChanged) {
         applyAuthUser(typedMessage.user || null);
+        if (typedMessage.user) void refreshMembershipStatus({ silent: true, forceCatalog: true });
         return false;
       }
 
@@ -1167,6 +1537,140 @@ export function App() {
     void runWalletAction('refresh', providerKey);
   }
 
+  // 创建订单
+  async function createPurchaseOrder(productType: 'membership' | 'usage_pack', code: string) {
+    const type = productType === 'membership'
+      ? MEMBERSHIP_MESSAGE_TYPES.createOrder
+      : USAGE_PACK_MESSAGE_TYPES.createOrder;
+    const response = await browser.runtime
+      .sendMessage({
+        type,
+        ...(productType === 'membership' ? { planCode: code } : { packCode: code }),
+      })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (!response?.ok || !response.data) {
+      throw new Error(response?.error || '订单创建失败');
+    }
+
+    return response.data as PaymentOrder;
+  }
+
+  // 发送付款
+  async function sendPurchasePayment(order: PaymentOrder) {
+    if (!order.paymentRequired || order.zeroPrice) {
+      return {
+        txHash: `free-${order.productType}-${order.orderId}`,
+        account: walletState?.account || null,
+        chainId: order.chainId,
+        freeClaim: true,
+      };
+    }
+
+    const chainOrderId = buildChainPaymentOrderId({
+      orderId: order.orderId,
+      productType: order.productType,
+      itemName: order.itemName,
+      amount: order.amount,
+      symbol: order.paymentSymbol,
+    });
+
+    const response = await browser.runtime
+      .sendMessage({
+        type: WALLET_MESSAGE_TYPES.sendPayment,
+        mode: 'xlayer',
+        providerKey: walletProviderKey,
+        to: order.recipientAddress,
+        valueHex: order.valueHex,
+        tokenAddress: order.paymentTokenAddress,
+        tokenAmountHex: order.paymentAmountHex,
+        tokenDecimals: order.paymentTokenDecimals,
+        tokenSymbol: order.paymentSymbol,
+        orderId: chainOrderId,
+      })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (!response?.ok || !response.data) {
+      throw new Error(response?.error || '链上支付失败');
+    }
+
+    return response.data as {
+      txHash?: string;
+      account?: string | null;
+      chainId?: string | number | null;
+      freeClaim?: boolean;
+    };
+  }
+
+  // 确认订单
+  async function confirmPurchaseOrder(order: PaymentOrder, payment: { txHash?: string; account?: string | null; chainId?: string | number | null }) {
+    const type = order.productType === 'membership'
+      ? MEMBERSHIP_MESSAGE_TYPES.confirmOrder
+      : USAGE_PACK_MESSAGE_TYPES.confirmOrder;
+    const response = await browser.runtime
+      .sendMessage({
+        type,
+        orderId: order.orderId,
+        txHash: payment.txHash,
+        senderAddress: payment.account,
+        chainId: parseChainId(payment.chainId) || order.chainId,
+      })
+      .catch((error) => ({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+
+    if (!response?.ok || !response.data) {
+      throw new Error(response?.error || '订单确认失败');
+    }
+
+    return response.data as PaymentConfirmation;
+  }
+
+  // 执行购买
+  async function handlePurchase(productType: 'membership' | 'usage_pack', code: string) {
+    const busyKey = `${productType}:${code}`;
+    setPurchaseBusyKey(busyKey);
+    setPurchaseFeedback({
+      tone: 'info',
+      title: '正在处理',
+      detail: '请按钱包弹窗完成链上支付。',
+    });
+
+    try {
+      const catalogItem = productType === 'membership'
+        ? getMembershipPlan(code, pricingCatalog.membershipPlans)
+        : pricingCatalog.usagePacks.find((pack) => pack.code === code);
+      if (!catalogItem || !isPaymentConfigReady(catalogItem)) {
+        throw new Error('当前项目暂不可用');
+      }
+
+      const priceAmount = getItemPriceAmount(catalogItem);
+      const order = await createPurchaseOrder(productType, code);
+      const payment = await sendPurchasePayment(order);
+      const confirmation = await confirmPurchaseOrder(order, payment);
+      await Promise.all([
+        refreshMembershipStatus({ silent: true, forceCatalog: true }),
+        refreshWalletState({ silent: true }),
+      ]);
+
+      const detail = productType === 'usage_pack'
+        ? `已到账 ${confirmation.creditCount ?? order.creditCount ?? 0} 次额度`
+        : `已启用 ${order.itemName}`;
+      setPurchaseFeedback({
+        tone: 'success',
+        title: payment.freeClaim ? '权益已启用' : '支付已确认',
+        detail: `${detail} · ${priceAmount} ${order.paymentSymbol}`,
+        txHash: payment.freeClaim ? undefined : payment.txHash,
+      });
+    } catch (error) {
+      setPurchaseFeedback({
+        tone: 'error',
+        title: '购买失败',
+        detail: error instanceof Error ? error.message : String(error || '购买失败'),
+      });
+    } finally {
+      setPurchaseBusyKey('');
+    }
+  }
+
   // 读地址偏好
   async function loadPortfolioAddressPreference() {
     const result = await browser.storage.local
@@ -1347,6 +1851,10 @@ export function App() {
         <div hidden={activeTab !== 'profile'}>
           <ProfileView
             user={authUser}
+            membershipStatus={membershipStatus}
+            pricingCatalog={pricingCatalog}
+            purchaseBusyKey={purchaseBusyKey}
+            purchaseFeedback={purchaseFeedback}
             walletState={walletState}
             walletProviderKey={walletProviderKey}
             walletBusy={walletBusy}
@@ -1356,6 +1864,8 @@ export function App() {
             portfolioBusy={portfolioBusy}
             portfolioError={portfolioError}
             logoutBusy={logoutBusy}
+            onRefreshMembership={() => refreshMembershipStatus({ forceCatalog: true })}
+            onPurchase={handlePurchase}
             onWalletProviderChange={handleWalletProviderChange}
             onWalletRefresh={() => runWalletAction('refresh')}
             onWalletConnect={() => runWalletAction('connect')}

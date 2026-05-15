@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, WALLET_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
+import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, USAGE_PACK_MESSAGE_TYPES, WALLET_MESSAGE_TYPES, createCorePong } from '../src/shared/messages';
 import { createGhostModeController } from '../src/background/ghost-mode';
 import { createAuthController } from '../src/background/auth';
 import { createMembershipController } from '../src/background/membership';
@@ -17,6 +17,19 @@ type RuntimeMessage = {
   force?: unknown;
   providerKey?: unknown;
   address?: unknown;
+  planCode?: unknown;
+  packCode?: unknown;
+  orderId?: unknown;
+  txHash?: unknown;
+  senderAddress?: unknown;
+  chainId?: unknown;
+  mode?: unknown;
+  to?: unknown;
+  valueHex?: unknown;
+  tokenAddress?: unknown;
+  tokenAmountHex?: unknown;
+  tokenDecimals?: unknown;
+  tokenSymbol?: unknown;
 };
 
 type RuntimeSender = Browser.runtime.MessageSender;
@@ -202,6 +215,66 @@ function handleRuntimeMessage(
     return true;
   }
 
+  if (message.type === MEMBERSHIP_MESSAGE_TYPES.createOrder) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await membership.createMembershipOrder(message.planCode) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === MEMBERSHIP_MESSAGE_TYPES.confirmOrder) {
+    void (async () => {
+      try {
+        sendResponse({
+          ok: true,
+          data: await membership.confirmMembershipOrder({
+            orderId: message.orderId,
+            txHash: message.txHash,
+            senderAddress: message.senderAddress,
+            chainId: message.chainId,
+          }),
+        });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === USAGE_PACK_MESSAGE_TYPES.createOrder) {
+    void (async () => {
+      try {
+        sendResponse({ ok: true, data: await membership.createUsagePackOrder(message.packCode) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === USAGE_PACK_MESSAGE_TYPES.confirmOrder) {
+    void (async () => {
+      try {
+        sendResponse({
+          ok: true,
+          data: await membership.confirmUsagePackOrder({
+            orderId: message.orderId,
+            txHash: message.txHash,
+            senderAddress: message.senderAddress,
+            chainId: message.chainId,
+          }),
+        });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
   if (message.type === WALLET_MESSAGE_TYPES.getState) {
     void (async () => {
       try {
@@ -228,6 +301,20 @@ function handleRuntimeMessage(
     void (async () => {
       try {
         sendResponse({ ok: true, data: await wallet.switchToXLayer(message.providerKey) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === WALLET_MESSAGE_TYPES.sendPayment) {
+    void (async () => {
+      try {
+        const data = message.mode === 'xlayer'
+          ? await wallet.sendXLayerPayment(message)
+          : await wallet.sendEvmNativePayment(message);
+        sendResponse({ ok: true, data });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       }

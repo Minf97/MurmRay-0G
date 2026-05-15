@@ -36,8 +36,9 @@ test('sidepanel does not keep a separate style map module', async () => {
   );
 });
 
-test('sidepanel keeps membership surface hidden', async () => {
+test('sidepanel exposes membership purchase surface', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
 
-  assert.doesNotMatch(app, /会员状态|补充额度|MEMBERSHIP_MESSAGE_TYPES|refreshMembershipStatus/);
+  assert.match(app, /会员权益|补充额度|MEMBERSHIP_MESSAGE_TYPES|refreshMembershipStatus/);
+  assert.match(app, /USAGE_PACK_MESSAGE_TYPES|WALLET_MESSAGE_TYPES\.sendPayment/);
 });
