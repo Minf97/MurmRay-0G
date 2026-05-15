@@ -468,7 +468,7 @@ function ResultBoard({
   ), [result, portfolioSnapshot]);
 
   if (status === 'loading') {
-    return <EmptyResult status="loading" message="正在读取页面并匹配 Polymarket 盘口。" />;
+    return <EmptyResult status="loading" message="正在读取页面并匹配市场盘口。" />;
   }
 
   if (status === 'error') {

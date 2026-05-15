@@ -1,4 +1,5 @@
 export const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+export const EX1024_API_BASE = 'https://api-testnet-stable.1024ex.com';
 export const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)';
 export const DEFAULT_INCREMENTAL_PAGE_LIMIT = 500;
 export const DEFAULT_INCREMENTAL_MAX_PAGES = 100;

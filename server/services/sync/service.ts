@@ -16,13 +16,12 @@ import {
 import {
   cleanupStoppedMarkets,
   createSyncInsforgeClient,
-  fetchExistingMarkets,
   getWatermark,
-  marketRowsDifferent,
   setWatermark,
-  upsertMarketsAndJobs,
 } from './db';
+import { fetch1024ActiveMarkets, fetch1024MarketsPage, map1024Market } from './ex1024';
 import { fetchGammaEventsPage, fetchGammaMarketsPage, mapGammaMarket } from './gamma';
+import { persistMarketChanges } from './rows';
 import type { CreateSyncServiceOptions, SyncInsforgeClient, SyncMarketRow, SyncRequest } from './types';
 
 // 时间戳毫秒
@@ -56,16 +55,6 @@ export function createSyncService(options: CreateSyncServiceOptions = {}) {
   // 取客户端
   function getClient(): SyncInsforgeClient {
     return options.insforgeClient ?? createSyncInsforgeClient(env);
-  }
-
-  // 写入变化
-  async function persistChangedRows(
-    client: SyncInsforgeClient,
-    rows: SyncMarketRow[],
-    dryRun: boolean,
-  ): Promise<{ upserted: number; jobsCreated: number }> {
-    if (dryRun || rows.length === 0) return { upserted: 0, jobsCreated: 0 };
-    return upsertMarketsAndJobs(client, rows, new Date(now()).toISOString());
   }
 
   // 增量同步
@@ -114,25 +103,13 @@ export function createSyncService(options: CreateSyncServiceOptions = {}) {
         break;
       }
 
-      const existingMap = await fetchExistingMarkets(client, scoped.map((row) => row.id));
-      const changedRows: SyncMarketRow[] = [];
-      for (const row of scoped) {
-        const existing = existingMap.get(row.id);
-        if (!existing) {
-          totals.newMarkets += 1;
-          changedRows.push(row);
-        } else if (marketRowsDifferent(existing, row)) {
-          totals.changedMarkets += 1;
-          changedRows.push(row);
-        } else {
-          totals.unchangedMarkets += 1;
-        }
-      }
-
-      const result = await persistChangedRows(client, changedRows, dryRun);
-      totals.marketsUpserted += result.upserted;
-      totals.jobsQueued += result.jobsCreated;
-      noImpactPages = changedRows.length === 0 ? noImpactPages + 1 : 0;
+      const result = await persistMarketChanges(client, scoped, dryRun, new Date(now()).toISOString());
+      totals.newMarkets += result.newMarkets;
+      totals.changedMarkets += result.changedMarkets;
+      totals.unchangedMarkets += result.unchangedMarkets;
+      totals.marketsUpserted += result.marketsUpserted;
+      totals.jobsQueued += result.jobsQueued;
+      noImpactPages = result.newMarkets + result.changedMarkets === 0 ? noImpactPages + 1 : 0;
       if (noImpactPages >= noChangeStopPages) {
         stoppedByNoImpact = true;
         finished = true;
@@ -211,19 +188,16 @@ export function createSyncService(options: CreateSyncServiceOptions = {}) {
     }
 
     const allMarkets = Array.from(marketMap.values());
-    const existingMap = await fetchExistingMarkets(client, allMarkets.map((row) => row.id));
-    const changedRows = allMarkets.filter((row) => !existingMap.get(row.id) || marketRowsDifferent(existingMap.get(row.id), row));
-    const result = await persistChangedRows(client, changedRows, dryRun);
+    const result = await persistMarketChanges(client, allMarkets, dryRun, new Date(now()).toISOString());
     const totals = {
       eventsFetched: totalEvents,
       marketsRawFetched: totalMarketsRaw,
       uniqueMarkets: allMarkets.length,
-      existingMatched: existingMap.size,
-      newMarkets: changedRows.filter((row) => !existingMap.get(row.id)).length,
-      changedMarkets: changedRows.filter((row) => existingMap.get(row.id)).length,
-      unchangedMarkets: allMarkets.length - changedRows.length,
-      marketsUpserted: result.upserted,
-      jobsQueued: result.jobsCreated,
+      newMarkets: result.newMarkets,
+      changedMarkets: result.changedMarkets,
+      unchangedMarkets: result.unchangedMarkets,
+      marketsUpserted: result.marketsUpserted,
+      jobsQueued: result.jobsQueued,
     };
 
     if (!dryRun && finished && observedNewestUpdatedAt) {
@@ -246,16 +220,75 @@ export function createSyncService(options: CreateSyncServiceOptions = {}) {
     };
   }
 
+  // 同步 1024ex
+  async function sync1024Markets(client: SyncInsforgeClient, body: SyncRequest, activeOnly = true) {
+    const startedAt = now();
+    const pageLimit = clampInt(body.pageLimit, activeOnly ? 500 : DEFAULT_INCREMENTAL_PAGE_LIMIT, 10, MAX_MARKET_PAGE_LIMIT);
+    const maxPages = clampInt(body.maxPages, activeOnly ? 1 : DEFAULT_FULL_MAX_PAGES, 1, MAX_FULL_MAX_PAGES);
+    const dryRun = Boolean(body.dryRun);
+    const rows: SyncMarketRow[] = [];
+    let pagesProcessed = 0;
+    let fetchedFrom1024ex = 0;
+    let finished = false;
+
+    while (pagesProcessed < maxPages && !finished) {
+      let hasNext = false;
+      const raw = activeOnly
+        ? await fetch1024ActiveMarkets(fetchImpl)
+        : await (async () => {
+          const page = await fetch1024MarketsPage(fetchImpl, pagesProcessed + 1, pageLimit);
+          hasNext = page.hasNext;
+          return page.items;
+        })();
+      pagesProcessed += 1;
+      fetchedFrom1024ex += raw.length;
+      rows.push(...raw.map(map1024Market).filter((row): row is SyncMarketRow => Boolean(row)));
+
+      finished = activeOnly || !hasNext;
+      if (!dryRun && !finished) await sleepImpl(100);
+    }
+
+    const result = await persistMarketChanges(client, rows, dryRun, new Date(now()).toISOString());
+    const cleanupSuccess = !dryRun && body.cleanup !== false ? await cleanupStoppedMarkets(client) : null;
+    return {
+      action: activeOnly ? 'sync_1024ex_active' : 'sync_1024ex_markets',
+      dryRun,
+      finished,
+      pageLimit,
+      maxPages,
+      pagesProcessed,
+      cleanupSuccess,
+      totals: {
+        fetchedFrom1024ex,
+        mappedValidMarkets: rows.length,
+        ...result,
+      },
+      timingMs: { totalMs: now() - startedAt },
+    };
+  }
+
+  // 每日同步
+  async function runDailySync(client: SyncInsforgeClient, body: SyncRequest) {
+    const dryRun = Boolean(body.dryRun);
+    const polymarket = await syncIncremental(client, { ...body, cleanup: false });
+    const ex1024 = await sync1024Markets(client, { ...body, cleanup: false }, true);
+    const cleanupSuccess = !dryRun && body.cleanup !== false ? await cleanupStoppedMarkets(client) : null;
+    return { action: 'run_daily_sync', polymarket, ex1024, cleanupSuccess };
+  }
+
   // 执行动作
   async function run(body: SyncRequest = {}) {
     const action = typeof body.action === 'string' && body.action.trim() ? body.action.trim() : 'sync_incremental';
     const client = getClient();
-    if (action === 'sync_incremental' || action === 'run_daily_sync') return syncIncremental(client, body);
+    if (action === 'sync_incremental') return syncIncremental(client, body);
+    if (action === 'run_daily_sync') return runDailySync(client, body);
     if (action === 'sync_full') return syncFull(client, body);
+    if (action === 'sync_1024ex' || action === 'sync_1024ex_active') return sync1024Markets(client, body, true);
+    if (action === 'sync_1024ex_markets') return sync1024Markets(client, body, false);
     if (action === 'cleanup_stopped' || action === 'cleanup_stopped_markets') {
       return { action: 'cleanup_stopped', success: await cleanupStoppedMarkets(client) };
     }
-    throw new Error('Unsupported action. Use action=sync_incremental, action=sync_full, action=run_daily_sync, or action=cleanup_stopped');
+    throw new Error('Unsupported action. Use sync_incremental, sync_full, run_daily_sync, sync_1024ex_active, sync_1024ex_markets, or cleanup_stopped');
   }
 
   return { run };
