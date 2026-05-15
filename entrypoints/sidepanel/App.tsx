@@ -539,12 +539,12 @@ function FeedView({
         </button>
       </header>
 
-      <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-(--rule) px-4" aria-label="运行状态">
+      {/* <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-(--rule) px-4" aria-label="运行状态">
         <StatusPill label={STATUS_COPY[channelStatus]} tone={statusTone(channelStatus)} />
         <StatusPill label={ANALYSIS_COPY[analysisStatus]} tone={statusTone(analysisStatus)} />
         <StatusPill label={ghostEnabled ? '幽灵模式开' : '幽灵模式关'} tone={ghostEnabled ? 'success' : 'neutral'} />
         <span className="shrink-0 text-xs tabular-nums text-(--ink-3)">{summarizeAnalysis(result)}</span>
-      </div>
+      </div> */}
 
       <ResultBoard status={analysisStatus} result={result} error={error} portfolioSnapshot={portfolioSnapshot} />
     </section>
