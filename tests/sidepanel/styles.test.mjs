@@ -36,9 +36,11 @@ test('sidepanel does not keep a separate style map module', async () => {
   );
 });
 
-test('sidepanel exposes membership purchase surface', async () => {
+test('sidepanel hides wallet and payment surfaces but keeps portfolio', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
 
-  assert.match(app, /会员权益|补充额度|MEMBERSHIP_MESSAGE_TYPES|refreshMembershipStatus/);
-  assert.match(app, /USAGE_PACK_MESSAGE_TYPES|WALLET_MESSAGE_TYPES\.sendPayment/);
+  assert.match(app, /SHOW_PAYMENT_SURFACE \? \(/);
+  assert.match(app, /SHOW_WALLET_SURFACE \? \(/);
+  assert.match(app, /<PortfolioBlock/);
+  assert.match(app, /walletLookupEnabled=\{SHOW_WALLET_SURFACE\}/);
 });
