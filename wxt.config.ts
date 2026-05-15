@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import {
   EXTENSION_DESCRIPTION,
+  EXTENSION_ICONS,
   EXTENSION_NAME,
   EXTENSION_PERMISSIONS,
   MINIMUM_CHROME_VERSION,
@@ -26,10 +27,12 @@ export default defineConfig({
     minimum_chrome_version: MINIMUM_CHROME_VERSION,
     name: EXTENSION_NAME,
     description: EXTENSION_DESCRIPTION,
+    icons: EXTENSION_ICONS,
     permissions: [...EXTENSION_PERMISSIONS],
     host_permissions: [...WEB_PAGE_MATCHES],
     action: {
       default_title: EXTENSION_NAME,
+      default_icon: EXTENSION_ICONS,
     },
   },
   vite: () => ({

@@ -521,10 +521,13 @@ function FeedView({
   return (
     <section id="view-feed" role="tabpanel" aria-labelledby="tab-feed">
       <header className="flex items-start justify-between gap-4 border-b border-(--rule) px-4 pb-4 pt-[18px]">
-        <div className="min-w-0">
-          <p className="m-0 mb-1.5 text-[11px] font-bold uppercase tracking-normal text-(--accent)">{EXTENSION_NAME}</p>
-          <h1 className="m-0 text-2xl font-[650] leading-[1.15] tracking-normal text-(--ink-1)">信号</h1>
-          <p className="mb-0 mt-2 line-clamp-2 max-w-[42ch] overflow-hidden text-[13px] leading-[1.4] text-(--ink-3)">{lastTitle || '尚未读取当前页面'}</p>
+        <div className="flex min-w-0 items-start gap-3">
+          <img src="/brand/murmray-logo.png" alt="" className="mt-0.5 size-10 shrink-0 rounded-md border border-(--rule) object-cover" />
+          <div className="min-w-0">
+            <p className="m-0 mb-1.5 text-[11px] font-bold uppercase tracking-normal text-(--accent)">{EXTENSION_NAME}</p>
+            <h1 className="m-0 text-2xl font-[650] leading-[1.15] tracking-normal text-(--ink-1)">信号</h1>
+            <p className="mb-0 mt-2 line-clamp-2 max-w-[42ch] overflow-hidden text-[13px] leading-[1.4] text-(--ink-3)">{lastTitle || '尚未读取当前页面'}</p>
+          </div>
         </div>
         <button
           type="button"

@@ -29,6 +29,14 @@ test('sidepanel css only keeps tailwind entry and global rules', async () => {
   }
 });
 
+test('sidepanel references migrated brand logo', async () => {
+  const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+  const authPanel = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/auth-panel.tsx'), 'utf8');
+  const source = `${app}\n${authPanel}`;
+
+  assert.match(source, /\/brand\/murmray-logo\.png/);
+});
+
 test('sidepanel does not keep a separate style map module', async () => {
   await assert.rejects(
     access(resolve(repoRoot, 'entrypoints/sidepanel/styles.ts')),

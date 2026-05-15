@@ -8,7 +8,12 @@ declare module "wxt/browser" {
     | "/_locales/en/messages.json"
     | "/_locales/zh_CN/messages.json"
     | "/background.js"
+    | "/brand/murmray-logo.png"
     | "/content-scripts/content.js"
+    | "/icon/128.png"
+    | "/icon/16.png"
+    | "/icon/32.png"
+    | "/icon/48.png"
     | "/sidepanel.html"
   type HtmlPublicPath = Extract<PublicPath, `${string}.html`>
   export interface WxtRuntime {
