@@ -9,12 +9,22 @@ export type WidgetElements = {
   pill: HTMLButtonElement;
 };
 
+// 固定宿主
+function pinWidgetHost(host: HTMLDivElement) {
+  host.style.setProperty('all', 'initial', 'important');
+  host.style.setProperty('display', 'block', 'important');
+  host.style.setProperty('position', 'static', 'important');
+  host.style.setProperty('width', '0', 'important');
+  host.style.setProperty('height', '0', 'important');
+}
+
 // 创建节点
 export function createWidgetElements() {
   document.getElementById('murmray-widget-host')?.remove();
 
   const host = document.createElement('div');
   host.id = 'murmray-widget-host';
+  pinWidgetHost(host);
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = renderWidgetTemplate();

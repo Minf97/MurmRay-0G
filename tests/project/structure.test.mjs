@@ -16,6 +16,9 @@ test('phase0 baseline files exist', async () => {
     'entrypoints/sidepanel/main.tsx',
     'entrypoints/sidepanel/App.tsx',
     'src/background/api.ts',
+    'src/content/widget/controller.ts',
+    'src/content/widget/dom.ts',
+    'src/content/widget/template.ts',
     'src/shared/analysis.ts',
     'src/shared/config.ts',
     'src/shared/manifest.ts',
@@ -26,5 +29,5 @@ test('phase0 baseline files exist', async () => {
   ];
 
   await Promise.all(requiredPaths.map(assertPathExists));
-  assert.equal(requiredPaths.length, 13);
+  assert.equal(requiredPaths.length, 16);
 });
