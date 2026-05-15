@@ -19,8 +19,11 @@ export const MAX_SELECTION_TEXT_CHARS = 2000;
 // 幽灵开关
 export const GHOST_MODE_STORAGE_KEY = 'murmray:ghost_mode_enabled';
 
+// 分析缓存
+export const ANALYSIS_CACHE_STORAGE_KEY = 'murmray:analysis_cache';
+
 // 缓存时长
-export const GHOST_CACHE_TTL_MS = 5 * 60 * 1000;
+export const GHOST_CACHE_TTL_MS = 10 * 60 * 1000;
 
 // 缓存数量
 export const GHOST_MAX_CACHE_ENTRIES = 80;

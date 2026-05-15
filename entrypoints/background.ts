@@ -154,7 +154,16 @@ function handleRuntimeMessage(
 
   if (message.type === GHOST_MESSAGE_TYPES.getTabState) {
     void (async () => {
-      sendResponse({ ok: true, payload: ghostMode.getTabState(message.tabId) });
+      const tabId = Number(message.tabId);
+      if (!Number.isFinite(tabId)) {
+        sendResponse({ ok: true, payload: null });
+        return;
+      }
+
+      const payload = await browser.tabs.get(tabId)
+        .then((tab) => ghostMode.syncTabStateFromCache(tab))
+        .catch(() => ghostMode.getTabState(tabId));
+      sendResponse({ ok: true, payload });
     })();
     return true;
   }
@@ -375,6 +384,20 @@ export default defineBackground(() => {
   // 清理标签
   browser.tabs.onRemoved.addListener((tabId) => {
     ghostMode.handleTabRemoved(tabId);
+  });
+
+  // 切换标签
+  browser.tabs.onActivated.addListener((activeInfo) => {
+    void browser.tabs.get(activeInfo.tabId)
+      .then((tab) => ghostMode.syncTabStateFromCache(tab))
+      .catch(() => undefined);
+  });
+
+  // 更新网址
+  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (!changeInfo.url) return;
+    void ghostMode.syncTabStateFromCache({ ...tab, id: tabId, url: changeInfo.url })
+      .catch(() => undefined);
   });
 
   void applySidePanelBehavior();

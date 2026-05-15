@@ -4,7 +4,7 @@ import {
   buildGhostPageKey,
   createGhostModeController,
 } from '../../src/background/ghost-mode';
-import { GHOST_MODE_STORAGE_KEY } from '../../src/shared/config';
+import { ANALYSIS_CACHE_STORAGE_KEY, GHOST_CACHE_TTL_MS, GHOST_MODE_STORAGE_KEY } from '../../src/shared/config';
 import { GHOST_MESSAGE_TYPES } from '../../src/shared/messages';
 
 const SAMPLE_PAGE = {
@@ -44,6 +44,9 @@ function createBrowserMock(initialStore = {}) {
         },
       },
       tabs: {
+        async get(tabId) {
+          return { id: tabId, title: SAMPLE_PAGE.title, url: SAMPLE_PAGE.url };
+        },
         async query() {
           return [];
         },
@@ -56,7 +59,7 @@ function createBrowserMock(initialStore = {}) {
 }
 
 test('buildGhostPageKey prefers cache hint and strips hash', () => {
-  assert.equal(buildGhostPageKey({ ...SAMPLE_PAGE, cacheKeyHint: 'story:1' }), 'hint:story:1');
+  assert.equal(buildGhostPageKey({ ...SAMPLE_PAGE, cacheKeyHint: 'story:1' }), 'https://example.com/news/1');
   assert.equal(buildGhostPageKey(SAMPLE_PAGE), 'https://example.com/news/1');
 });
 
@@ -163,6 +166,70 @@ test('ghost mode returns cached result after first analysis', async () => {
   assert.equal(second.payload.cached, true);
   assert.equal(second.payload.status, 'no_opportunity');
   assert.equal(mock.runtimeMessages.some((message) => message.type === GHOST_MESSAGE_TYPES.stateUpdated), true);
+});
+
+test('ghost mode restores cached tab state by url', async () => {
+  const nowMs = Date.parse('2026-05-16T00:00:00.000Z');
+  const pageKey = 'https://example.com/news/1';
+  const mock = createBrowserMock({
+    [ANALYSIS_CACHE_STORAGE_KEY]: {
+      [pageKey]: {
+        result: {
+          totalMarkets: 7,
+          matches: [
+            { marketId: 1, question: 'A', confidence: 80, direction: 'Yes', reason: '', marketUrl: null },
+          ],
+        },
+        expiresAt: nowMs + GHOST_CACHE_TTL_MS,
+        updatedAt: nowMs,
+      },
+    },
+  });
+  const controller = createGhostModeController({
+    browser: mock.browser,
+    now: () => nowMs,
+    analyzePage: async () => ({ totalMarkets: 0, matches: [] }),
+  });
+
+  const restored = await controller.syncTabStateFromCache({
+    id: 3,
+    title: SAMPLE_PAGE.title,
+    url: SAMPLE_PAGE.url,
+  });
+
+  assert.equal(restored.status, 'opportunity');
+  assert.equal(restored.cached, true);
+  assert.equal(restored.totalMarkets, 7);
+  assert.equal(controller.getTabState(3).pageKey, pageKey);
+});
+
+test('ghost mode ignores expired cached tab state', async () => {
+  const nowMs = Date.parse('2026-05-16T00:00:00.000Z');
+  const pageKey = 'https://example.com/news/1';
+  const mock = createBrowserMock({
+    [ANALYSIS_CACHE_STORAGE_KEY]: {
+      [pageKey]: {
+        result: { totalMarkets: 7, matches: [] },
+        expiresAt: nowMs - 1,
+        updatedAt: nowMs - GHOST_CACHE_TTL_MS,
+      },
+    },
+  });
+  const controller = createGhostModeController({
+    browser: mock.browser,
+    now: () => nowMs,
+    analyzePage: async () => ({ totalMarkets: 0, matches: [] }),
+  });
+
+  const payload = await controller.syncTabStateFromCache({
+    id: 3,
+    title: SAMPLE_PAGE.title,
+    url: SAMPLE_PAGE.url,
+  });
+
+  assert.equal(payload.status, 'idle');
+  assert.equal(payload.cached, false);
+  assert.equal(payload.totalMarkets, 0);
 });
 
 test('ghost mode stops analysis when quota check fails', async () => {

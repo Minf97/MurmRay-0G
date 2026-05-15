@@ -1,6 +1,4 @@
 import {
-  GHOST_CACHE_TTL_MS,
-  GHOST_MAX_CACHE_ENTRIES,
   GHOST_MODE_STORAGE_KEY,
 } from '../shared/config';
 import { GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../shared/messages';
@@ -11,6 +9,7 @@ import {
   type AnalysisResult,
   type PageContext,
 } from '../shared/analysis';
+import { buildAnalysisCacheKey, createAnalysisCache } from './analysis-cache';
 import { invokePolymarketAnalysis } from './api';
 import type { Browser } from 'wxt/browser';
 
@@ -31,11 +30,6 @@ export type GhostStatePayload = {
   error: string;
   cached: boolean;
   updatedAt: string;
-};
-
-type StoredCache = {
-  result: AnalysisResult;
-  expiresAt: number;
 };
 
 type GhostStorage = {
@@ -71,15 +65,7 @@ function normalizeStoredBoolean(value: unknown, fallback = false) {
 
 // 标准页键
 export function buildGhostPageKey(pageContext: Pick<PageContext, 'url' | 'cacheKeyHint'>) {
-  if (pageContext.cacheKeyHint) return `hint:${pageContext.cacheKeyHint}`;
-
-  try {
-    const parsed = new URL(pageContext.url);
-    parsed.hash = '';
-    return parsed.toString();
-  } catch {
-    return String(pageContext.url || '');
-  }
+  return buildAnalysisCacheKey(pageContext.url);
 }
 
 // 创建载荷
@@ -121,35 +107,10 @@ export function createGhostModeController(options: GhostControllerOptions) {
   const consumeAnalysisQuota = options.consumeAnalysisQuota || (async () => undefined);
   const now = options.now || (() => Date.now());
   const createRequestId = options.createRequestId || (() => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+  const analysisCache = createAnalysisCache(storage, now);
 
   const stateByTabId = new Map<number, GhostStatePayload>();
-  const cacheByPageKey = new Map<string, StoredCache>();
   const inFlightByPageKey = new Map<string, Promise<AnalysisResult>>();
-
-  // 写入缓存
-  function setCachedResult(pageKey: string, result: AnalysisResult) {
-    cacheByPageKey.set(pageKey, {
-      result,
-      expiresAt: now() + GHOST_CACHE_TTL_MS,
-    });
-
-    while (cacheByPageKey.size > GHOST_MAX_CACHE_ENTRIES) {
-      const oldestKey = cacheByPageKey.keys().next().value;
-      if (!oldestKey) break;
-      cacheByPageKey.delete(oldestKey);
-    }
-  }
-
-  // 读取缓存
-  function getCachedResult(pageKey: string) {
-    const cached = cacheByPageKey.get(pageKey);
-    if (!cached) return null;
-    if (cached.expiresAt <= now()) {
-      cacheByPageKey.delete(pageKey);
-      return null;
-    }
-    return cached.result;
-  }
 
   // 通知面板
   async function notifyState(payload: GhostStatePayload) {
@@ -220,7 +181,7 @@ export function createGhostModeController(options: GhostControllerOptions) {
 
   // 运行分析
   async function analyzeWithCache(pageKey: string, pageContext: PageContext) {
-    const cached = getCachedResult(pageKey);
+    const cached = await analysisCache.get(pageKey);
     if (cached) {
       return { result: cached, cached: true };
     }
@@ -238,7 +199,7 @@ export function createGhostModeController(options: GhostControllerOptions) {
     inFlightByPageKey.set(pageKey, promise);
     try {
       const result = await promise;
-      setCachedResult(pageKey, result);
+      await analysisCache.set(pageKey, result);
       return { result, cached: false };
     } finally {
       inFlightByPageKey.delete(pageKey);
@@ -380,6 +341,36 @@ export function createGhostModeController(options: GhostControllerOptions) {
     stateByTabId.delete(Number(tabId));
   }
 
+  // 同步缓存态
+  async function syncTabStateFromCache(tab: { id?: unknown; title?: unknown; url?: unknown }) {
+    const tabId = Number(tab.id);
+    const url = typeof tab.url === 'string' ? tab.url : '';
+    if (!Number.isFinite(tabId) || !/^https?:/i.test(url)) return null;
+
+    const pageContext = {
+      title: typeof tab.title === 'string' && tab.title.trim() ? tab.title : url,
+      url,
+      pageText: '',
+      selectedText: '',
+      cacheKeyHint: '',
+    };
+    const pageKey = buildAnalysisCacheKey(url);
+    const cached = await analysisCache.get(pageKey);
+    const existing = stateByTabId.get(tabId);
+    if (!cached && existing?.pageKey === pageKey && existing.status === 'analyzing') {
+      return existing;
+    }
+
+    const status: GhostStatus = cached ? (cached.matches.length ? 'opportunity' : 'no_opportunity') : 'idle';
+    const payload = createGhostPayload(tabId, pageContext, status, cached || { totalMarkets: 0, matches: [] }, {
+      pageKey,
+      cached: Boolean(cached),
+      updatedAt: new Date(now()).toISOString(),
+    });
+    await setTabState(tabId, payload);
+    return payload;
+  }
+
   // 当前状态
   function getTabState(tabId: unknown) {
     const normalizedTabId = Number(tabId);
@@ -396,5 +387,6 @@ export function createGhostModeController(options: GhostControllerOptions) {
     handleContentReady,
     handleTabRemoved,
     setEnabled,
+    syncTabStateFromCache,
   };
 }
