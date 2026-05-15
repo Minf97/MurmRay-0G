@@ -1,13 +1,9 @@
-export const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
 export const OPENROUTER_API_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_MODEL = 'x-ai/grok-4.20';
 export const DEFAULT_OPENROUTER_EMBED_MODEL = 'google/gemini-embedding-2-preview';
-export const DEFAULT_OPENROUTER_EMBED_DIMENSIONS = '3072';
+export const DEFAULT_OPENROUTER_EMBED_DIMENSIONS = 3072;
 export const DEFAULT_OPENROUTER_HTTP_REFERER = 'https://murmray.app';
 export const DEFAULT_OPENROUTER_APP_TITLE = 'MurmRay';
-export const DEFAULT_TOP_K = 100;
-export const DEFAULT_PREFETCH_COUNT = 1200;
-export const DEFAULT_EMBED_BATCH_SIZE = 80;
 
 // 截断文本
 export function clipText(input: unknown, maxChars: number): string {
@@ -34,4 +30,11 @@ export function chunkArray<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+// 暂停重试
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }

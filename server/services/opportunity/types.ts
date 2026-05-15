@@ -1,6 +1,5 @@
 export type FetchImpl = typeof fetch;
-
-export type ServerEnv = Record<string, string | undefined>;
+export type { ServerEnv } from '../shared/insforge';
 
 export interface PageContext {
   title: string;

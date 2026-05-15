@@ -2,7 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { createAnalysisService } from './services/polymarket-opportunity/service';
+import { createEmbeddingWorker } from './services/embeddings/service';
+import { createAnalysisService } from './services/opportunity/service';
 
 const DEFAULT_PORT = 8789;
 const HOST = '127.0.0.1';
@@ -67,6 +68,7 @@ function normalizeErrorStatus(error: unknown): number {
 loadEnvFiles();
 
 const service = createAnalysisService();
+const embeddingWorker = createEmbeddingWorker();
 const port = Number(process.env.MURMRAY_BACKEND_PORT || DEFAULT_PORT);
 const app = new Hono();
 
@@ -94,6 +96,19 @@ app.post('/api/polymarket-opportunity', async (c) => {
     const status = normalizeErrorStatus(error);
     const message = error instanceof Error ? error.message : String(error || '分析失败');
     console.error('[murmray-backend] request failed:', error);
+    return jsonResponse(c, status, { error: message });
+  }
+});
+
+app.post('/api/polymarket-embeddings', async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await embeddingWorker.run(body);
+    return jsonResponse(c, 200, result);
+  } catch (error) {
+    const status = normalizeErrorStatus(error);
+    const message = error instanceof Error ? error.message : String(error || 'Embedding worker failed');
+    console.error('[murmray-backend] embedding worker failed:', error);
     return jsonResponse(c, status, { error: message });
   }
 });

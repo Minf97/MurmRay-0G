@@ -1,33 +1,10 @@
-import { createClient } from '@insforge/sdk';
 import { mapInsforgeMarket } from './market';
+import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge';
 import type { InsforgeClient, ServerEnv, VectorCandidate } from './types';
-
-// 读配置
-function readInsforgeConfig(env: ServerEnv): { baseUrl: string; anonKey: string } {
-  const baseUrl = env.INSFORGE_BASE_URL;
-  const anonKey = env.ANON_KEY;
-
-  if (!baseUrl) {
-    throw new Error('Missing INSFORGE_BASE_URL');
-  }
-
-  if (!anonKey) {
-    throw new Error('Missing ANON_KEY');
-  }
-
-  return { baseUrl, anonKey };
-}
 
 // 建客户端
 export function createInsforgeClient(env: ServerEnv): InsforgeClient {
-  const { baseUrl, anonKey } = readInsforgeConfig(env);
-  return createClient({
-    baseUrl,
-    anonKey,
-    edgeFunctionToken: anonKey,
-    autoRefreshToken: false,
-    persistSession: false,
-  }) as unknown as InsforgeClient;
+  return createSharedInsforgeClient<InsforgeClient>(env);
 }
 
 // 取向量候选

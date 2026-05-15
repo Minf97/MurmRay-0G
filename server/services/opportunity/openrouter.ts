@@ -6,7 +6,7 @@ import {
   DEFAULT_OPENROUTER_MODEL,
   OPENROUTER_API_BASE_URL,
   clipText,
-} from './config';
+} from '../shared/config';
 import { parseJsonLoose, readStringArray } from './json';
 import type { FetchImpl, PageContext, ServerEnv, SummaryData } from './types';
 

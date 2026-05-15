@@ -1,4 +1,4 @@
-# polymarket-opportunity
+# opportunity
 
 已迁移的 Polymarket opportunity edge function 服务。
 

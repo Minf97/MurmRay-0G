@@ -5,8 +5,8 @@ import {
   createAnalysisService,
   mergeCandidateLists,
   pickTopMarkets,
-} from '../../server/services/polymarket-opportunity/service';
-import { mapInsforgeMarket } from '../../server/services/polymarket-opportunity/market';
+} from '../../server/services/opportunity/service';
+import { mapInsforgeMarket } from '../../server/services/opportunity/market';
 
 // 包装响应
 function createJsonResponse(payload, status = 200) {
