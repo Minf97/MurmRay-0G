@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { createAnalysisService } from './analysis-service.js';
+import { createAnalysisService } from './services/polymarket-opportunity/service';
 
 const DEFAULT_PORT = 8789;
 const HOST = '127.0.0.1';
@@ -14,7 +14,7 @@ const CORS_HEADERS = {
 };
 
 // 读取环境
-function loadEnvFiles() {
+function loadEnvFiles(): void {
   for (const relativePath of ['.env.local', '.env']) {
     const filePath = resolve(process.cwd(), relativePath);
     if (!existsSync(filePath)) continue;
@@ -38,7 +38,7 @@ function loadEnvFiles() {
 }
 
 // 叠加头部
-function applyCors(response) {
+function applyCors(response: Response): Response {
   for (const [key, value] of Object.entries(CORS_HEADERS)) {
     response.headers.set(key, value);
   }
@@ -46,12 +46,12 @@ function applyCors(response) {
 }
 
 // 发 JSON
-function jsonResponse(c, status, payload) {
+function jsonResponse(c: { json: (payload: unknown, status: number) => Response }, status: number, payload: unknown): Response {
   return applyCors(c.json(payload, status));
 }
 
 // 判定状态
-function normalizeErrorStatus(error) {
+function normalizeErrorStatus(error: unknown): number {
   const message = error instanceof Error ? error.message : String(error || '');
   if (
     message.includes('Invalid page context')
@@ -87,7 +87,7 @@ app.get('/health', (c) => jsonResponse(c, 200, { ok: true }));
 
 app.post('/api/polymarket-opportunity', async (c) => {
   try {
-    const body = await c.req.json().catch(() => ({}));
+    const body = await c.req.json();
     const result = await service.analyze(body);
     return jsonResponse(c, 200, result);
   } catch (error) {
@@ -110,7 +110,7 @@ const server = serve(
 );
 
 // 平滑退出
-function shutdown() {
+function shutdown(): void {
   server.close(() => {
     process.exit(0);
   });

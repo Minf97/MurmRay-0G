@@ -23,11 +23,13 @@ test('phase0 baseline files exist', async () => {
     'src/shared/config.ts',
     'src/shared/manifest.ts',
     'src/shared/messages.ts',
-    'server/analysis-service.js',
-    'server/index.js',
+    'server/services/polymarket-opportunity/service.ts',
+    'server/services/polymarket-opportunity/insforge.ts',
+    'server/services/polymarket-opportunity/openrouter.ts',
+    'server/index.ts',
     'scripts/dev.js',
   ];
 
   await Promise.all(requiredPaths.map(assertPathExists));
-  assert.equal(requiredPaths.length, 16);
+  assert.equal(requiredPaths.length, 18);
 });
