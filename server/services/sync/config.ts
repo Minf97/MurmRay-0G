@@ -1,0 +1,17 @@
+export const GAMMA_API_BASE = 'https://gamma-api.polymarket.com';
+export const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)';
+export const DEFAULT_INCREMENTAL_PAGE_LIMIT = 500;
+export const DEFAULT_INCREMENTAL_MAX_PAGES = 100;
+export const DEFAULT_FULL_PAGE_LIMIT = 50;
+export const DEFAULT_FULL_MAX_PAGES = 500;
+export const MAX_MARKET_PAGE_LIMIT = 500;
+export const MAX_INCREMENTAL_MAX_PAGES = 2000;
+export const MAX_FULL_PAGE_LIMIT = 100;
+export const MAX_FULL_MAX_PAGES = 4000;
+export const EXISTING_FETCH_CHUNK = 200;
+export const UPSERT_CHUNK_SIZE = 400;
+export const DEFAULT_OVERLAP_SECONDS = 120;
+export const DEFAULT_NO_CHANGE_STOP_PAGES = 3;
+export const MAX_OVERLAP_SECONDS = 24 * 60 * 60;
+export const MAX_NO_CHANGE_STOP_PAGES = 50;
+export const WATERMARK_STATE_KEY = 'polymarket_sync_watermark';

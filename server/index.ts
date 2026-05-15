@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { createEmbeddingWorker } from './services/embeddings/service';
 import { createAnalysisService } from './services/opportunity/service';
+import { createSyncService } from './services/sync/service';
 
 const DEFAULT_PORT = 8789;
 const HOST = '127.0.0.1';
@@ -69,6 +70,7 @@ loadEnvFiles();
 
 const service = createAnalysisService();
 const embeddingWorker = createEmbeddingWorker();
+const syncService = createSyncService();
 const port = Number(process.env.MURMRAY_BACKEND_PORT || DEFAULT_PORT);
 const app = new Hono();
 
@@ -109,6 +111,19 @@ app.post('/api/polymarket-embeddings', async (c) => {
     const status = normalizeErrorStatus(error);
     const message = error instanceof Error ? error.message : String(error || 'Embedding worker failed');
     console.error('[murmray-backend] embedding worker failed:', error);
+    return jsonResponse(c, status, { error: message });
+  }
+});
+
+app.post('/api/polymarket-sync', async (c) => {
+  try {
+    const body = await c.req.json();
+    const result = await syncService.run(body);
+    return jsonResponse(c, 200, result);
+  } catch (error) {
+    const status = normalizeErrorStatus(error);
+    const message = error instanceof Error ? error.message : String(error || 'Sync failed');
+    console.error('[murmray-backend] sync failed:', error);
     return jsonResponse(c, status, { error: message });
   }
 });

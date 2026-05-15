@@ -31,10 +31,13 @@ test('phase0 baseline files exist', async () => {
     'server/services/embeddings/openrouter.ts',
     'server/services/shared/config.ts',
     'server/services/shared/openrouter.ts',
+    'server/services/sync/service.ts',
+    'server/services/sync/gamma.ts',
+    'server/services/sync/db.ts',
     'server/index.ts',
     'scripts/dev.js',
   ];
 
   await Promise.all(requiredPaths.map(assertPathExists));
-  assert.equal(requiredPaths.length, 23);
+  assert.equal(requiredPaths.length, 26);
 });
