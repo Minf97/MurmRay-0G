@@ -9,6 +9,7 @@ declare module "wxt/browser" {
     | "/_locales/zh_CN/messages.json"
     | "/background.js"
     | "/brand/1024ex-symbol-dark.svg"
+    | "/brand/1024ex-symbol-light.svg"
     | "/brand/murmray-logo.png"
     | "/content-scripts/content.js"
     | "/icon/128.png"

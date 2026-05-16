@@ -60,14 +60,18 @@ test('settings exposes 1024ex partner link', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
   const settingsView = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-view.tsx'), 'utf8');
   const partners = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-partners.tsx'), 'utf8');
-  const logoPath = resolve(repoRoot, 'public/brand/1024ex-symbol-dark.svg');
+  const darkLogoPath = resolve(repoRoot, 'public/brand/1024ex-symbol-dark.svg');
+  const lightLogoPath = resolve(repoRoot, 'public/brand/1024ex-symbol-light.svg');
 
-  await access(logoPath);
+  await access(darkLogoPath);
+  await access(lightLogoPath);
   assert.match(app, /<SettingsView/);
-  assert.match(settingsView, /<SettingsPartnerMerchants \/>/);
+  assert.match(settingsView, /<SettingsPartnerMerchants resolvedTheme=\{resolvedTheme\} \/>/);
   assert.match(partners, /https:\/\/www\.1024ex\.com/);
   assert.match(partners, /\/brand\/1024ex-symbol-dark\.svg/);
+  assert.match(partners, /\/brand\/1024ex-symbol-light\.svg/);
   assert.match(partners, /\/brand\/murmray-logo\.png/);
+  assert.match(partners, /resolvedTheme === 'dark'/);
   assert.match(partners, /displayPrefix: '1'/);
   assert.match(partners, /displaySuffix: '24ex'/);
   assert.match(partners, /MurmRay/);
