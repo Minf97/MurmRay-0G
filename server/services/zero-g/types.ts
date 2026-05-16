@@ -1,0 +1,109 @@
+export type ServerEnv = Record<string, string | undefined>;
+
+export interface SignalSource {
+  title: string;
+  url: string;
+}
+
+export interface SignalMarket {
+  id: string;
+  question: string;
+  url: string;
+}
+
+export interface SignalMatch {
+  confidence: number;
+  direction: string;
+  reason: string;
+}
+
+export interface SignalAi {
+  summary: string;
+  signal: string;
+  evidence: string[];
+}
+
+export interface SignalPayload {
+  schemaVersion: 1;
+  source: SignalSource;
+  market: SignalMarket;
+  match: SignalMatch;
+  ai: SignalAi;
+  generatedAt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface PublishSignalRequest {
+  action?: unknown;
+  signal?: unknown;
+}
+
+export interface StorageSaveInput {
+  signalHash: string;
+  payload: string;
+}
+
+export interface StorageProof {
+  storageUri: string;
+  rootHash: string;
+  storageTxHash: string | null;
+}
+
+export interface ChainRegisterInput {
+  signalHash: string;
+  storageUri: string;
+}
+
+export interface ChainProof {
+  txHash: string;
+  contractAddress: string;
+  explorerUrl: string;
+  chainId: string;
+}
+
+export interface ChainSignalAnchor extends ChainProof {
+  signalHash: string;
+  storageUri: string;
+  blockNumber: number;
+  logIndex: number;
+}
+
+export interface SignalProof extends StorageProof, ChainProof {
+  signalHash: string;
+  sourceTitle: string;
+  sourceUrl: string;
+  marketId: string;
+  marketQuestion: string;
+  marketUrl: string;
+  confidence: number;
+  direction: string;
+  createdAt: string;
+}
+
+export interface ZeroGStorageClient {
+  saveSignal(input: StorageSaveInput): Promise<StorageProof>;
+  loadSignal(storageUri: string): Promise<SignalPayload>;
+}
+
+export interface ZeroGChainClient {
+  registerSignalHash(input: ChainRegisterInput): Promise<ChainProof>;
+  listSignalAnchors(limit: number): Promise<ChainSignalAnchor[]>;
+  findSignalAnchor(signalHash: string): Promise<ChainSignalAnchor | null>;
+}
+
+export interface CreateZeroGProofServiceOptions {
+  env?: ServerEnv;
+  now?: () => number;
+  storageClient?: ZeroGStorageClient;
+  chainClient?: ZeroGChainClient;
+}
+
+export class ProofHttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ProofHttpError';
+    this.status = status;
+  }
+}
