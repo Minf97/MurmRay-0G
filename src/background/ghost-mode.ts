@@ -5,6 +5,7 @@ import { GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../shared/messages';
 import {
   buildPageContext,
   isBlacklistedUrl,
+  isNoOpportunityAnalysisError,
   normalizeAnalysisResult,
   type AnalysisResult,
   type PageContext,
@@ -255,6 +256,21 @@ export function createGhostModeController(options: GhostControllerOptions) {
       return { ok: true, result, payload };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || '分析失败');
+      if (isNoOpportunityAnalysisError(error)) {
+        const emptyResult = { totalMarkets: 0, matches: [] };
+        const payload = createGhostPayload(tabId, pageContext, 'no_opportunity', emptyResult, {
+          pageKey,
+          requestId,
+          triggerSource,
+        });
+
+        if (isCurrentRequest(tabId, pageKey, requestId)) {
+          await setTabState(tabId, payload);
+        }
+
+        return { ok: true, result: emptyResult, payload };
+      }
+
       const payload = createGhostPayload(tabId, pageContext, 'error', { totalMarkets: 0, matches: [] }, {
         pageKey,
         requestId,

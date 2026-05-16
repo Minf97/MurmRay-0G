@@ -8,6 +8,19 @@ export function clipText(text: unknown, maxLength: number) {
   return `${normalized.slice(0, Math.max(0, maxLength - 1))}…`;
 }
 
+// 无机会错误
+export function isNoOpportunityAnalysisError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('page text is empty')
+    || lower.includes('summary is empty')
+    || lower.includes('no analyzable content')
+    || lower.includes('no actionable event')
+    || lower.includes('no prediction-market event')
+  );
+}
+
 // 标准链接
 export function normalizePolymarketUrl(input: unknown) {
   if (typeof input !== 'string') return null;

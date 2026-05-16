@@ -95,6 +95,27 @@ test('mapInsforgeMarket rejects invalid vector rows', () => {
   );
 });
 
+test('createAnalysisService reports empty page text before remote calls', async () => {
+  const service = createAnalysisService({
+    fetchImpl: async () => {
+      throw new Error('fetch should not run');
+    },
+  });
+
+  await assert.rejects(
+    () => service.analyze({
+      action: 'analyze_page',
+      pageContext: {
+        title: 'Plain page',
+        url: 'https://example.com/plain',
+        pageText: '',
+        selectedText: '',
+      },
+    }),
+    /Page text is empty/,
+  );
+});
+
 // 伪造客户端
 function createFakeInsforgeClient(rpcCalls) {
   return {

@@ -168,6 +168,24 @@ test('ghost mode returns cached result after first analysis', async () => {
   assert.equal(mock.runtimeMessages.some((message) => message.type === GHOST_MESSAGE_TYPES.stateUpdated), true);
 });
 
+test('ghost mode treats empty analysis content as no opportunity', async () => {
+  const mock = createBrowserMock();
+  const controller = createGhostModeController({
+    browser: mock.browser,
+    analyzePage: async () => {
+      throw new Error('Summary is empty');
+    },
+    createRequestId: () => 'req-1',
+  });
+
+  const response = await controller.analyzePageContext(SAMPLE_PAGE, { tabId: 3 });
+
+  assert.equal(response.ok, true);
+  assert.equal(response.result.matches.length, 0);
+  assert.equal(response.payload.status, 'no_opportunity');
+  assert.equal(controller.getTabState(3).status, 'no_opportunity');
+});
+
 test('ghost mode restores cached tab state by url', async () => {
   const nowMs = Date.parse('2026-05-16T00:00:00.000Z');
   const pageKey = 'https://example.com/news/1';

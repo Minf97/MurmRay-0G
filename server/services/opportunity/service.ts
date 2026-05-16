@@ -35,11 +35,11 @@ function readPageContext(body: AnalysisRequest): PageContext {
   };
 
   if (!page.url || !/^https?:/i.test(page.url)) {
-    throw new Error('Invalid page context');
+    throw new Error('Invalid page URL.');
   }
 
   if (!page.pageText && !page.selectedText) {
-    throw new Error('Invalid page context');
+    throw new Error('Page text is empty.');
   }
 
   return page;

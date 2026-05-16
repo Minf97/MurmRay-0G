@@ -5,6 +5,7 @@ import { POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY } from '../../src/shared/confi
 import { SHOW_PAYMENT_SURFACE, SHOW_WALLET_SURFACE } from '../../src/shared/feature-flags';
 import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, USAGE_PACK_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
 import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
+import { isNoOpportunityAnalysisError } from '../../src/shared/analysis';
 import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
 import { getChainDisplay, isXLayerChain, XLAYER_MAINNET } from '../../src/shared/chains';
@@ -435,7 +436,7 @@ function OpportunityRow({ match }: { match: AnalysisMatch }) {
 }
 
 // 空白状态
-function EmptyResult({ status, message }: { status: AnalysisStatus; message: string }) {
+function EmptyResult({ status, message, title }: { status: AnalysisStatus; message: string; title?: string }) {
   return (
     <article className="flex min-h-[calc(100vh-146px)] flex-col items-center justify-center gap-3 px-[18px] py-8 text-center">
       <span
@@ -457,7 +458,7 @@ function EmptyResult({ status, message }: { status: AnalysisStatus; message: str
           <circle cx="12" cy="20" r="0.6" />
         </svg>
       </span>
-      <h2 className={`m-0 text-[22px] font-[650] tracking-normal text-(--ink-1) ${status === 'error' ? 'text-(--bad)' : ''}`}>{ANALYSIS_COPY[status]}</h2>
+      <h2 className={`m-0 text-[22px] font-[650] tracking-normal text-(--ink-1) ${status === 'error' ? 'text-(--bad)' : ''}`}>{title || ANALYSIS_COPY[status]}</h2>
       <p className="m-0 max-w-[32ch] text-[13px] leading-[1.55] text-(--ink-3)">{message}</p>
     </article>
   );
@@ -496,7 +497,7 @@ function ResultBoard({
   }
 
   if (!matches.length) {
-    return <EmptyResult status="ready" message="当前页面与可下注题目关联不足。" />;
+    return <EmptyResult status="ready" title="未发现机会" message="当前页面与可下注题目关联不足。" />;
   }
 
   return (
@@ -1427,6 +1428,13 @@ export function App() {
       setAnalysisStatus('ready');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || '分析失败');
+      if (isNoOpportunityAnalysisError(error)) {
+        setAnalysisError('');
+        setAnalysisResult({ totalMarkets: 0, matches: [] });
+        setAnalysisStatus('ready');
+        return;
+      }
+
       setAnalysisError(message);
       setAnalysisResult(null);
       setAnalysisStatus('error');

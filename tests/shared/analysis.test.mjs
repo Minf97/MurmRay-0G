@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildPageContext,
+  isNoOpportunityAnalysisError,
   isBlacklistedUrl,
   mergeMatches,
 } from '../../src/shared/analysis';
@@ -27,6 +28,12 @@ test('buildPageContext rejects invalid payload', () => {
     url: 'ftp://example.com',
     pageText: 'hello',
   }));
+});
+
+test('isNoOpportunityAnalysisError detects empty analysis pages', () => {
+  assert.equal(isNoOpportunityAnalysisError(new Error('Page text is empty.')), true);
+  assert.equal(isNoOpportunityAnalysisError(new Error('Summary is empty')), true);
+  assert.equal(isNoOpportunityAnalysisError(new Error('无法连接云端分析服务')), false);
 });
 
 test('isBlacklistedUrl filters obvious pages', () => {
