@@ -51,6 +51,7 @@ import {
   type SidePanelTab,
 } from './view-model';
 import { AuthLoading, AuthPanel, UserProfile, type AuthStatus } from './auth-panel';
+import { SettingsPartnerMerchants } from './settings-partners';
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
 type ActiveTabInfo = { id: number; title: string };
@@ -522,7 +523,7 @@ function FeedView({
     <section id="view-feed" role="tabpanel" aria-labelledby="tab-feed">
       <header className="flex items-start justify-between gap-4 border-b border-(--rule) px-4 pb-4 pt-[18px]">
         <div className="flex min-w-0 items-start gap-3">
-          <img src="/brand/murmray-logo.png" alt="" className="mt-0.5 size-10 shrink-0 rounded-md border border-(--rule) object-cover" />
+          {/* <img src="/brand/murmray-logo.png" alt="" className="mt-0.5 size-10 shrink-0 rounded-md border border-(--rule) object-cover" /> */}
           <div className="min-w-0">
             <p className="m-0 mb-1.5 text-[11px] font-bold uppercase tracking-normal text-(--accent)">{EXTENSION_NAME}</p>
             <h1 className="m-0 text-2xl font-[650] leading-[1.15] tracking-normal text-(--ink-1)">信号</h1>
@@ -1170,7 +1171,7 @@ function SettingsView({
   onToggleGhost: (enabled: boolean) => void;
 }) {
   return (
-    <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings">
+    <section className="flex min-h-[calc(100vh-64px)] flex-col" id="view-settings" role="tabpanel" aria-labelledby="tab-settings">
       <div className="flex min-h-[60px] items-center justify-between gap-3 border-b border-(--rule) px-4">
         <div className="inline-flex min-w-0 items-center gap-2">
           <span className="text-sm font-semibold text-(--ink-1)">幽灵模式</span>
@@ -1189,6 +1190,7 @@ function SettingsView({
           </span>
         </label>
       </div>
+      <SettingsPartnerMerchants />
     </section>
   );
 }

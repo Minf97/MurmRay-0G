@@ -1,5 +1,5 @@
 // 扩展名称
-export const EXTENSION_NAME = 'MURMRAY';
+export const EXTENSION_NAME = 'MurmRay';
 
 // 扩展描述
 export const EXTENSION_DESCRIPTION = 'MurmRay opportunity radar for Polymarket signals.';

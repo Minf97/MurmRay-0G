@@ -37,6 +37,26 @@ test('sidepanel references migrated brand logo', async () => {
   assert.match(source, /\/brand\/murmray-logo\.png/);
 });
 
+test('settings exposes 1024ex partner link', async () => {
+  const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+  const partners = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-partners.tsx'), 'utf8');
+  const logoPath = resolve(repoRoot, 'public/brand/1024ex-symbol-dark.svg');
+
+  await access(logoPath);
+  assert.match(app, /<SettingsPartnerMerchants \/>/);
+  assert.match(partners, /https:\/\/www\.1024ex\.com/);
+  assert.match(partners, /\/brand\/1024ex-symbol-dark\.svg/);
+  assert.match(partners, /\/brand\/murmray-logo\.png/);
+  assert.match(partners, /displayPrefix: '1'/);
+  assert.match(partners, /displaySuffix: '24ex'/);
+  assert.match(partners, /MurmRay/);
+  assert.match(partners, /\{partner\.name\}/);
+  assert.doesNotMatch(partners, /hover:/);
+  assert.doesNotMatch(partners, /transition-/);
+  assert.doesNotMatch(partners, />合作友商</);
+  assert.doesNotMatch(partners, />Partner</);
+});
+
 test('sidepanel does not keep a separate style map module', async () => {
   await assert.rejects(
     access(resolve(repoRoot, 'entrypoints/sidepanel/styles.ts')),
