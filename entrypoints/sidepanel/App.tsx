@@ -1858,7 +1858,7 @@ export function App() {
       </nav>
 
       <div>
-        <div hidden={activeTab !== 'feed'}>
+        <div className="tab-panel-shell" hidden={activeTab !== 'feed'}>
           <FeedView
             channelStatus={channelStatus}
             analysisStatus={analysisStatus}
@@ -1870,7 +1870,7 @@ export function App() {
             onAnalyze={handleAnalyzeClick}
           />
         </div>
-        <div hidden={activeTab !== 'profile'}>
+        <div className="tab-panel-shell" hidden={activeTab !== 'profile'}>
           <ProfileView
             user={authUser}
             membershipStatus={membershipStatus}
@@ -1899,7 +1899,7 @@ export function App() {
             onLogout={handleLogout}
           />
         </div>
-        <div hidden={activeTab !== 'settings'}>
+        <div className="tab-panel-shell" hidden={activeTab !== 'settings'}>
           <SettingsView
             ghostEnabled={ghostEnabled}
             ghostBusy={ghostBusy}

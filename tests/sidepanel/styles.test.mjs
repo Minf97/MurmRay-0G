@@ -48,6 +48,18 @@ test('sidepanel exposes light and dark theme tokens', async () => {
   assert.match(widgetTheme, /storage\.onChanged/);
 });
 
+test('sidepanel animates tab panel transitions', async () => {
+  const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+  const css = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/style.css'), 'utf8');
+
+  assert.match(app, /className="tab-panel-shell" hidden=\{activeTab !== 'feed'\}/);
+  assert.match(app, /className="tab-panel-shell" hidden=\{activeTab !== 'profile'\}/);
+  assert.match(app, /className="tab-panel-shell" hidden=\{activeTab !== 'settings'\}/);
+  assert.match(css, /@keyframes tab-panel-rise/);
+  assert.match(css, /\.tab-panel-shell:not\(\[hidden\]\)/);
+  assert.match(css, /prefers-reduced-motion: reduce/);
+});
+
 test('sidepanel references migrated brand logo', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
   const authPanel = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/auth-panel.tsx'), 'utf8');
