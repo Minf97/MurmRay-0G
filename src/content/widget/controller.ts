@@ -5,9 +5,10 @@ import { createWidgetElements } from './dom';
 import { createWidgetDragController } from './drag';
 import { renderWidget } from './render';
 import { installWidgetThemeSync, loadWidgetThemePreference, type WidgetThemeStorage } from './theme';
+import { sendContentRuntimeMessage } from '../runtime';
 
 type BrowserLike = {
-  runtime: { sendMessage(message: unknown): Promise<any> };
+  runtime?: { sendMessage(message: unknown): Promise<any> } | null;
   storage: WidgetThemeStorage & {
     local: WidgetThemeStorage['local'] & { set(items: Record<string, unknown>): Promise<void> };
   };
@@ -101,8 +102,7 @@ export function createContentWidgetController(options: WidgetOptions) {
       return;
     }
 
-    void options.browser.runtime
-      .sendMessage({ type: GHOST_MESSAGE_TYPES.openSidepanel })
+    void sendContentRuntimeMessage(options.browser, { type: GHOST_MESSAGE_TYPES.openSidepanel })
       .catch(() => undefined);
   }
 
@@ -132,7 +132,7 @@ export function createContentWidgetController(options: WidgetOptions) {
     render();
 
     try {
-      const response = await options.browser.runtime.sendMessage({
+      const response = await sendContentRuntimeMessage(options.browser, {
         type: GHOST_MESSAGE_TYPES.analyzePage,
         pageContext,
         allowBlacklisted: Boolean(optionsArg.allowBlacklisted),
@@ -277,8 +277,7 @@ export function createContentWidgetController(options: WidgetOptions) {
       });
       elements.pill.addEventListener('click', handleWidgetClick);
 
-      const response = await options.browser.runtime
-        .sendMessage({ type: GHOST_MESSAGE_TYPES.getState })
+      const response = await sendContentRuntimeMessage(options.browser, { type: GHOST_MESSAGE_TYPES.getState })
         .catch(() => null);
       setGhostModeEnabled(Boolean(response?.enabled));
     },

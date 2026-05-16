@@ -3,6 +3,7 @@ import { WEB_PAGE_MATCHES } from '../src/shared/manifest';
 import { CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, PAGE_MESSAGE_TYPES } from '../src/shared/messages';
 import { readPageContext } from '../src/content/page-context';
 import { createContentWidgetController } from '../src/content/widget/controller';
+import { getContentRuntime, sendContentRuntimeMessage } from '../src/content/runtime';
 
 const READY_DELAY_MS = 700;
 
@@ -10,12 +11,11 @@ let readyTimer: ReturnType<typeof setTimeout> | null = null;
 
 // 广播就绪
 function notifyContentReady() {
-  void browser.runtime
-    .sendMessage({
-      type: CORE_MESSAGE_TYPES.contentReady,
-      url: location.href,
-      title: document.title,
-    })
+  void sendContentRuntimeMessage(browser, {
+    type: CORE_MESSAGE_TYPES.contentReady,
+    url: location.href,
+    title: document.title,
+  })
     .catch(() => undefined);
 }
 
@@ -69,7 +69,7 @@ export default defineContentScript({
     });
 
     // 监听消息
-    browser.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+    getContentRuntime(browser).onMessage?.addListener((message: unknown, _sender, sendResponse) => {
       if (!message || typeof message !== 'object') return false;
       const typedMessage = message as { type?: unknown; enabled?: unknown; payload?: unknown };
 
