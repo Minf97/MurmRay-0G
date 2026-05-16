@@ -18,11 +18,31 @@ export const WIDGET_DEFAULT_BOTTOM = 22;
 
 const WIDGET_STYLE = `
 :host {
+  color-scheme: light dark;
   --paper:#fff; --surface:#f8fafc; --ink-1:#111827; --ink-2:#374151;
   --ink-3:#6b7280; --ink-4:#9ca3af; --ink-5:#cbd5e1;
   --rule:#e5e7eb; --rule-strong:#d1d5db; --accent:#1e40af;
   --accent-soft:#dbeafe; --bad:#be123c; --score-very-high:#059669;
   --score-high:#d97706; --score-medium:#0284c7; --score-moderate:#4f46e5;
+}
+:host([data-theme="light"]) { color-scheme: light; }
+:host([data-theme="dark"]) {
+  color-scheme: dark;
+  --paper:#0d1117; --surface:#151a23; --ink-1:#f3f6fb; --ink-2:#d8dee9;
+  --ink-3:#9aa6b8; --ink-4:#6f7b8d; --ink-5:#4f5b6e;
+  --rule:#2b3443; --rule-strong:#3b4658; --accent:#6aa7ff;
+  --accent-soft:#15345f; --bad:#fb7185; --score-very-high:#4fd1a1;
+  --score-high:#f6b756; --score-medium:#5bb8f7; --score-moderate:#a78bfa;
+}
+@media (prefers-color-scheme: dark) {
+  :host(:not([data-theme])) {
+    color-scheme: dark;
+    --paper:#0d1117; --surface:#151a23; --ink-1:#f3f6fb; --ink-2:#d8dee9;
+    --ink-3:#9aa6b8; --ink-4:#6f7b8d; --ink-5:#4f5b6e;
+    --rule:#2b3443; --rule-strong:#3b4658; --accent:#6aa7ff;
+    --accent-soft:#15345f; --bad:#fb7185; --score-very-high:#4fd1a1;
+    --score-high:#f6b756; --score-medium:#5bb8f7; --score-moderate:#a78bfa;
+  }
 }
 * { box-sizing: border-box; }
 .ghost-wrap {

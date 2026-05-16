@@ -1,17 +1,16 @@
 import { GHOST_MESSAGE_TYPES } from '../../shared/messages';
 import { isBlacklistedUrl, type PageContext } from '../../shared/analysis';
-import {
-  normalizeWidgetMatches,
-  resolveWidgetStatus,
-  type WidgetState,
-} from '../widget-model';
+import { normalizeWidgetMatches, resolveWidgetStatus, type WidgetState } from '../widget-model';
 import { createWidgetElements } from './dom';
 import { createWidgetDragController } from './drag';
 import { renderWidget } from './render';
+import { installWidgetThemeSync, loadWidgetThemePreference, type WidgetThemeStorage } from './theme';
 
 type BrowserLike = {
   runtime: { sendMessage(message: unknown): Promise<any> };
-  storage: { local: { get(key: string): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void> } };
+  storage: WidgetThemeStorage & {
+    local: WidgetThemeStorage['local'] & { set(items: Record<string, unknown>): Promise<void> };
+  };
 };
 
 type WidgetOptions = {
@@ -264,6 +263,8 @@ export function createContentWidgetController(options: WidgetOptions) {
   return {
     async init() {
       drag.bind();
+      await loadWidgetThemePreference(elements, options.browser.storage);
+      installWidgetThemeSync(elements, options.browser.storage);
       await drag.loadPosition();
       render();
 

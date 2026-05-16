@@ -40,6 +40,12 @@ import {
   type WalletState,
 } from '../../src/shared/wallet';
 import {
+  normalizeThemePreference,
+  resolveThemePreference,
+  THEME_STORAGE_KEY,
+  type ThemePreference,
+} from '../../src/shared/theme';
+import {
   getDirectionMeta,
   getScoreTier,
   getTabIndex,
@@ -51,7 +57,7 @@ import {
   type SidePanelTab,
 } from './view-model';
 import { AuthLoading, AuthPanel, UserProfile, type AuthStatus } from './auth-panel';
-import { SettingsPartnerMerchants } from './settings-partners';
+import { SettingsView } from './settings-view';
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
 type ActiveTabInfo = { id: number; title: string };
@@ -70,6 +76,11 @@ const ANALYSIS_COPY: Record<AnalysisStatus, string> = {
   error: '分析失败',
   blocked: '已跳过',
 };
+
+// 系统主题
+function readSystemPrefersDark() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 // 检测通道
 async function detectChannelStatus() {
@@ -1160,41 +1171,6 @@ function ProfileView({
   );
 }
 
-// 设置视图
-function SettingsView({
-  ghostEnabled,
-  ghostBusy,
-  onToggleGhost,
-}: {
-  ghostEnabled: boolean;
-  ghostBusy: boolean;
-  onToggleGhost: (enabled: boolean) => void;
-}) {
-  return (
-    <section className="flex min-h-[calc(100vh-64px)] flex-col" id="view-settings" role="tabpanel" aria-labelledby="tab-settings">
-      <div className="flex min-h-[60px] items-center justify-between gap-3 border-b border-(--rule) px-4">
-        <div className="inline-flex min-w-0 items-center gap-2">
-          <span className="text-sm font-semibold text-(--ink-1)">幽灵模式</span>
-          <span className="inline-flex min-h-[22px] items-center rounded-full border border-(--rule) bg-(--surface) px-2 text-[11px] font-semibold text-(--ink-2)">{ghostEnabled ? '已开启' : '已关闭'}</span>
-        </div>
-        <label className="inline-flex min-h-11 cursor-pointer items-center" aria-label="幽灵模式">
-          <input
-            className="peer sr-only"
-            type="checkbox"
-            checked={ghostEnabled}
-            disabled={ghostBusy}
-            onChange={(event) => onToggleGhost(event.currentTarget.checked)}
-          />
-          <span className="relative h-5 w-[34px] rounded-full bg-(--rule-strong) transition-colors duration-160 peer-checked:bg-(--ink-1) peer-disabled:opacity-60 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-(--accent) peer-checked:[&>span]:translate-x-3.5" aria-hidden="true">
-            <span className="absolute left-[3px] top-[3px] size-3.5 rounded-full bg-(--paper) transition-transform duration-160 [box-shadow:0_1px_2px_rgb(17_24_39/18%)]" />
-          </span>
-        </label>
-      </div>
-      <SettingsPartnerMerchants />
-    </section>
-  );
-}
-
 // 主应用
 export function App() {
   const [activeTab, setActiveTab] = useState<SidePanelTab>('feed');
@@ -1207,6 +1183,8 @@ export function App() {
   const activeTabIdRef = useRef<number | null>(null);
   const [ghostEnabled, setGhostEnabled] = useState(false);
   const [ghostBusy, setGhostBusy] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>('system');
+  const [systemPrefersDark, setSystemPrefersDark] = useState(readSystemPrefersDark);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authError, setAuthError] = useState('');
@@ -1223,6 +1201,10 @@ export function App() {
   const [portfolioAddressInput, setPortfolioAddressInput] = useState('');
   const [portfolioBusy, setPortfolioBusy] = useState(false);
   const [portfolioError, setPortfolioError] = useState('');
+  const resolvedTheme = useMemo(
+    () => resolveThemePreference(themePreference, systemPrefersDark),
+    [themePreference, systemPrefersDark],
+  );
 
   // 应用幽灵态
   function applyGhostPayload(payload: GhostStatePayload | null | undefined) {
@@ -1385,6 +1367,33 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    let alive = true;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+    // 读取主题
+    void browser.storage.local.get(THEME_STORAGE_KEY).then((result) => {
+      if (!alive) return;
+      setThemePreference(normalizeThemePreference(result[THEME_STORAGE_KEY]));
+    });
+
+    // 监听系统
+    const handleSystemThemeChange = () => {
+      setSystemPrefersDark(media.matches);
+    };
+    media.addEventListener('change', handleSystemThemeChange);
+
+    return () => {
+      alive = false;
+      media.removeEventListener('change', handleSystemThemeChange);
+    };
+  }, []);
+
   // 触发分析
   async function handleAnalyzeClick() {
     setActiveTab('feed');
@@ -1456,6 +1465,14 @@ export function App() {
     } finally {
       setGhostBusy(false);
     }
+  }
+
+  // 切换主题
+  function handleThemePreferenceChange(preference: ThemePreference) {
+    setThemePreference(preference);
+    void browser.storage.local.set({
+      [THEME_STORAGE_KEY]: preference,
+    });
   }
 
   // 谷歌登录
@@ -1886,7 +1903,10 @@ export function App() {
           <SettingsView
             ghostEnabled={ghostEnabled}
             ghostBusy={ghostBusy}
+            themePreference={themePreference}
+            resolvedTheme={resolvedTheme}
             onToggleGhost={handleGhostToggle}
+            onThemePreferenceChange={handleThemePreferenceChange}
           />
         </div>
       </div>

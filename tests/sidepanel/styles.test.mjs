@@ -29,6 +29,25 @@ test('sidepanel css only keeps tailwind entry and global rules', async () => {
   }
 });
 
+test('sidepanel exposes light and dark theme tokens', async () => {
+  const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+  const settingsView = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-view.tsx'), 'utf8');
+  const css = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/style.css'), 'utf8');
+  const widgetTemplate = await readFile(resolve(repoRoot, 'src/content/widget/template.ts'), 'utf8');
+  const widgetController = await readFile(resolve(repoRoot, 'src/content/widget/controller.ts'), 'utf8');
+  const widgetTheme = await readFile(resolve(repoRoot, 'src/content/widget/theme.ts'), 'utf8');
+
+  assert.match(app, /THEME_STORAGE_KEY/);
+  assert.match(app, /dataset\.theme/);
+  assert.match(settingsView, /跟随系统/);
+  assert.match(css, /\[data-theme="dark"\]/);
+  assert.match(css, /prefers-color-scheme: dark/);
+  assert.match(widgetTemplate, /:host\(\[data-theme="dark"\]\)/);
+  assert.match(widgetTemplate, /prefers-color-scheme: dark/);
+  assert.match(widgetController, /installWidgetThemeSync/);
+  assert.match(widgetTheme, /storage\.onChanged/);
+});
+
 test('sidepanel references migrated brand logo', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
   const authPanel = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/auth-panel.tsx'), 'utf8');
@@ -39,11 +58,13 @@ test('sidepanel references migrated brand logo', async () => {
 
 test('settings exposes 1024ex partner link', async () => {
   const app = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/App.tsx'), 'utf8');
+  const settingsView = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-view.tsx'), 'utf8');
   const partners = await readFile(resolve(repoRoot, 'entrypoints/sidepanel/settings-partners.tsx'), 'utf8');
   const logoPath = resolve(repoRoot, 'public/brand/1024ex-symbol-dark.svg');
 
   await access(logoPath);
-  assert.match(app, /<SettingsPartnerMerchants \/>/);
+  assert.match(app, /<SettingsView/);
+  assert.match(settingsView, /<SettingsPartnerMerchants \/>/);
   assert.match(partners, /https:\/\/www\.1024ex\.com/);
   assert.match(partners, /\/brand\/1024ex-symbol-dark\.svg/);
   assert.match(partners, /\/brand\/murmray-logo\.png/);
