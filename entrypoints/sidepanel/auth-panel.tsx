@@ -63,7 +63,7 @@ export function AuthPanel({ status, error, onGoogleLogin }: AuthPanelProps) {
   return (
     <main className="grid min-h-screen place-items-center bg-(--paper) px-[18px] py-6 text-(--ink-1)">
       <section className="w-[min(100%,320px)]" aria-label="登录">
-        <BrandMark />
+        {/* <BrandMark /> */}
         <p className="m-0 mb-2 text-xs font-extrabold uppercase tracking-normal text-(--accent)">MURMRAY</p>
         <h1 className="m-0 text-[28px] font-bold leading-[1.12] text-(--ink-1)">把日常浏览变成交易线索</h1>
         <p className="mb-[22px] mt-3 text-sm leading-[1.55] text-(--ink-3)">为你扫描 Polymarket，标出值得下注的盘口。</p>
@@ -88,7 +88,7 @@ export function AuthPanel({ status, error, onGoogleLogin }: AuthPanelProps) {
 export function UserProfile({ user, logoutBusy, onLogout }: UserProfileProps) {
   return (
     <div className="flex items-center gap-3 border-b border-(--rule) px-4 py-6">
-      <BrandMark compact />
+      {/* <BrandMark compact /> */}
       <div className="min-w-0 flex-1">
         <h2 className="m-0 truncate text-base font-[650] text-(--ink-1)">{user.email || user.profile.name || '用户'}</h2>
         <p className="mb-0 mt-1 truncate text-[13px] text-(--ink-3)">{user.profile.name || `MURMRAY · ${getUserInitial(user)}`}</p>

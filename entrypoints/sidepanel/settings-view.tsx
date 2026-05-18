@@ -78,7 +78,7 @@ export function SettingsView({
           </span>
         </label>
       </div>
-      <SettingsPartnerMerchants resolvedTheme={resolvedTheme} />
+      {/* <SettingsPartnerMerchants resolvedTheme={resolvedTheme} /> */}
     </section>
   );
 }
