@@ -5,7 +5,7 @@ export function renderZeroGProofPage(): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>0G Proof</title>
+  <title>Signal Ledger</title>
   <style>
     :root {
       color-scheme: dark;
@@ -92,15 +92,15 @@ export function renderZeroGProofPage(): string {
   <main>
     <header>
       <div>
-        <h1>0G Proof</h1>
-        <p class="sub">Signals are stored on 0G Storage and anchored on 0G Chain for later audit and replay.</p>
+        <h1>Signal Ledger</h1>
+        <p class="sub">MurmRay records each AI market judgment on 0G, then tracks whether it is still active, expired, or resolved.</p>
       </div>
       <div class="status" id="status">Loading…</div>
     </header>
     <div class="grid" id="summary"></div>
     <section class="shell" style="margin-top:16px;">
       <div class="toolbar">
-        <strong>Latest proofs</strong>
+        <strong>Latest signals</strong>
         <button type="button" id="refresh">Refresh</button>
       </div>
       <div id="tableRoot"></div>
@@ -128,34 +128,34 @@ export function renderZeroGProofPage(): string {
 
     function renderSummary(proofs) {
       const total = proofs.length;
-      const lastHash = total > 0 ? proofs[0].signalHash : '—';
-      const lastTx = total > 0 ? proofs[0].txHash : '—';
-      const lastUri = total > 0 ? proofs[0].storageUri : '—';
+      const active = proofs.filter((proof) => proof.lifecycleStatus === 'active').length;
+      const expired = proofs.filter((proof) => proof.lifecycleStatus === 'expired').length;
+      const resolved = proofs.filter((proof) => proof.lifecycleStatus === 'resolved').length;
       summaryEl.innerHTML = [
         summaryCard('Signals', total),
-        summaryCard('Latest hash', lastHash),
-        summaryCard('Latest tx', lastTx),
-        summaryCard('Latest uri', lastUri),
+        summaryCard('Active', active),
+        summaryCard('Expired', expired),
+        summaryCard('Resolved', resolved),
       ].join('');
     }
 
     function renderTable(proofs) {
       if (!proofs.length) {
-        tableRoot.innerHTML = '<div class="empty">No proofs recorded yet.</div>';
+        tableRoot.innerHTML = '<div class="empty">No signals recorded yet.</div>';
         return;
       }
 
       const rows = proofs.map((proof) => {
         return '<tr>' +
-          '<td><span class="badge">' + esc(proof.direction) + '</span><br><code>' + esc(proof.confidence) + '</code></td>' +
-          '<td><code>' + esc(proof.signalHash) + '</code><br><span>' + esc(proof.marketQuestion) + '</span></td>' +
-          '<td><code>' + esc(proof.storageUri) + '</code><br><a href="' + esc(proof.storageUri) + '" target="_blank" rel="noreferrer">Storage</a></td>' +
+          '<td><span class="badge">' + esc(proof.lifecycleStatus || 'untracked') + '</span><br><code>' + esc(proof.outcomeStatus || 'pending') + '</code></td>' +
+          '<td><span>' + esc(proof.marketQuestion) + '</span><br><code>' + esc(proof.direction) + ' · ' + esc(proof.confidence) + '</code><br><span>' + esc(proof.trackRecordNote || '') + '</span></td>' +
+          '<td><code>' + esc(proof.signalHash) + '</code><br><code>' + esc(proof.storageUri) + '</code><br><a href="' + esc(proof.storageUri) + '" target="_blank" rel="noreferrer">Storage</a></td>' +
           '<td><code>' + esc(proof.txHash) + '</code><br><code>' + esc(proof.contractAddress) + '</code><br><a href="' + esc(proof.explorerUrl) + '" target="_blank" rel="noreferrer">Explorer</a></td>' +
-          '<td><code>' + esc(proof.createdAt) + '</code><br><a href="' + esc(proof.sourceUrl) + '" target="_blank" rel="noreferrer">Source</a></td>' +
+          '<td><code>' + esc(proof.createdAt) + '</code><br><code>' + esc(proof.marketEndDate || 'no end date') + '</code><br><a href="' + esc(proof.sourceUrl) + '" target="_blank" rel="noreferrer">Source</a></td>' +
         '</tr>';
       }).join('');
 
-      tableRoot.innerHTML = '<table><thead><tr><th>Match</th><th>Signal</th><th>Storage URI</th><th>Tx Hash / Contract</th><th>Created</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      tableRoot.innerHTML = '<table><thead><tr><th>Status</th><th>Market judgment</th><th>0G Storage</th><th>0G Chain</th><th>Timeline</th></tr></thead><tbody>' + rows + '</tbody></table>';
     }
 
     async function loadProofs() {

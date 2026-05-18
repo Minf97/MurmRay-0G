@@ -10,6 +10,21 @@ export const ANALYSIS_FUNCTION_NAME = 'polymarket-opportunity';
 // 请求超时
 export const ANALYSIS_TIMEOUT_MS = 20_000;
 
+type ImportMetaWithEnv = ImportMeta & {
+  env?: Record<string, string | undefined>;
+};
+
+// 读取构建变量
+function readBuildEnv(name: string) {
+  return ((import.meta as ImportMetaWithEnv).env?.[name] || '').trim();
+}
+
+// 0G 服务地址
+export const ZERO_G_PROOF_API_BASE_URL = readBuildEnv('WXT_ZERO_G_PROOF_API_BASE_URL') || 'http://127.0.0.1:8790';
+
+// 0G 发布密钥
+export const ZERO_G_PROOF_API_KEY = readBuildEnv('WXT_ZERO_G_PROOF_API_KEY');
+
 // 文本上限
 export const MAX_PAGE_TEXT_CHARS = 12000;
 

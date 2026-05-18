@@ -76,6 +76,7 @@ export function mergeMatches(matches: unknown[]) {
     direction: string;
     reason: string;
     marketUrl: string | null;
+    marketEndDate: string | null;
   }>();
 
   for (const match of matches) {
@@ -97,6 +98,7 @@ export function mergeMatches(matches: unknown[]) {
         ? (match as { reason: string }).reason
         : '',
       marketUrl: resolveOpportunityUrl(match as Record<string, unknown>),
+      marketEndDate: clipText((match as { marketEndDate?: unknown })?.marketEndDate, 80) || null,
     };
 
     const existing = byMarketId.get(marketId);
@@ -109,6 +111,7 @@ export function mergeMatches(matches: unknown[]) {
       byMarketId.set(marketId, {
         ...candidate,
         marketUrl: candidate.marketUrl || existing.marketUrl,
+        marketEndDate: candidate.marketEndDate || existing.marketEndDate,
       });
       continue;
     }
@@ -117,12 +120,20 @@ export function mergeMatches(matches: unknown[]) {
       byMarketId.set(marketId, {
         ...existing,
         marketUrl: existing.marketUrl || candidate.marketUrl,
+        marketEndDate: existing.marketEndDate || candidate.marketEndDate,
       });
       continue;
     }
 
-    if (candidate.marketUrl && !existing.marketUrl) {
-      byMarketId.set(marketId, { ...existing, marketUrl: candidate.marketUrl });
+    if (
+      (candidate.marketUrl && !existing.marketUrl)
+      || (candidate.marketEndDate && !existing.marketEndDate)
+    ) {
+      byMarketId.set(marketId, {
+        ...existing,
+        marketUrl: existing.marketUrl || candidate.marketUrl,
+        marketEndDate: existing.marketEndDate || candidate.marketEndDate,
+      });
     }
   }
 
@@ -207,23 +218,77 @@ export interface AnalysisMatch {
   direction: string;
   reason: string;
   marketUrl: string | null;
+  marketEndDate?: string | null;
   isHeld?: boolean;
   heldOutcomeLabel?: string;
   heldCashPnl?: number;
   heldCurrentValue?: number;
   heldPositionCount?: number;
 }
-
+export type ZeroGProofStatus = 'idle' | 'skipped' | 'ready' | 'error';
+export interface ZeroGProofSummary {
+  signalHash: string;
+  storageUri: string;
+  txHash: string;
+  contractAddress: string;
+  explorerUrl: string;
+  marketId: string;
+  marketQuestion: string;
+  marketEndDate: string | null;
+  lifecycleStatus: string;
+  outcomeStatus: string;
+  trackRecordNote: string;
+  sourceTitle: string;
+  createdAt: string;
+}
 export interface AnalysisResult {
   totalMarkets: number;
   matches: AnalysisMatch[];
+  zeroGProofs?: ZeroGProofSummary[];
+  zeroGProofStatus?: ZeroGProofStatus;
+  zeroGProofError?: string;
+  zeroGProofPageUrl?: string;
 }
-
-// 标准结果
+function normalizeZeroGProofs(value: unknown): ZeroGProofSummary[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const proof = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+      const signalHash = clipText(proof.signalHash, 80);
+      const storageUri = clipText(proof.storageUri, 240);
+      const txHash = clipText(proof.txHash, 80);
+      if (!signalHash || !storageUri || !txHash) return null;
+      return {
+        signalHash,
+        storageUri,
+        txHash,
+        contractAddress: clipText(proof.contractAddress, 120),
+        explorerUrl: clipText(proof.explorerUrl, 1200),
+        marketId: clipText(proof.marketId, 120),
+        marketQuestion: clipText(proof.marketQuestion, 500),
+        marketEndDate: clipText(proof.marketEndDate, 80) || null,
+        lifecycleStatus: clipText(proof.lifecycleStatus, 40),
+        outcomeStatus: clipText(proof.outcomeStatus, 40),
+        trackRecordNote: clipText(proof.trackRecordNote, 500),
+        sourceTitle: clipText(proof.sourceTitle, 300),
+        createdAt: clipText(proof.createdAt, 80),
+      };
+    })
+    .filter((item): item is ZeroGProofSummary => Boolean(item));
+}
+function normalizeZeroGProofStatus(value: unknown, proofs: ZeroGProofSummary[]): ZeroGProofStatus {
+  if (value === 'idle' || value === 'skipped' || value === 'ready' || value === 'error') return value;
+  return proofs.length ? 'ready' : 'idle';
+}
 export function normalizeAnalysisResult(raw: unknown): AnalysisResult {
   const data = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const zeroGProofs = normalizeZeroGProofs(data.zeroGProofs);
   return {
     totalMarkets: Number.isFinite(Number(data.totalMarkets)) ? Number(data.totalMarkets) : 0,
     matches: mergeMatches(Array.isArray(data.matches) ? data.matches : []),
+    zeroGProofs,
+    zeroGProofStatus: normalizeZeroGProofStatus(data.zeroGProofStatus, zeroGProofs),
+    zeroGProofError: clipText(data.zeroGProofError, 500),
+    zeroGProofPageUrl: clipText(data.zeroGProofPageUrl, 1200),
   };
 }

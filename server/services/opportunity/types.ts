@@ -42,6 +42,7 @@ export interface MatchResult {
   direction: string;
   reason: string;
   marketUrl: string | null;
+  marketEndDate: string | null;
 }
 
 export interface AnalysisRequest {

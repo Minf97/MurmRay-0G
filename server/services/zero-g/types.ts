@@ -9,6 +9,7 @@ export interface SignalMarket {
   id: string;
   question: string;
   url: string;
+  endDate: string | null;
 }
 
 export interface SignalMatch {
@@ -32,6 +33,9 @@ export interface SignalPayload {
   generatedAt: string;
   metadata: Record<string, unknown>;
 }
+
+export type SignalLifecycleStatus = 'active' | 'expired' | 'resolved' | 'untracked';
+export type SignalOutcomeStatus = 'pending' | 'hit' | 'miss' | 'unknown';
 
 export interface PublishSignalRequest {
   action?: unknown;
@@ -75,8 +79,12 @@ export interface SignalProof extends StorageProof, ChainProof {
   marketId: string;
   marketQuestion: string;
   marketUrl: string;
+  marketEndDate: string | null;
   confidence: number;
   direction: string;
+  lifecycleStatus: SignalLifecycleStatus;
+  outcomeStatus: SignalOutcomeStatus;
+  trackRecordNote: string;
   createdAt: string;
 }
 

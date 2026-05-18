@@ -11,7 +11,7 @@ function sampleRequest(extraSignal = {}) {
     action: 'publish_signal',
     signal: {
       source: { title: 'Tariff update', url: 'https://example.com/news/tariff' },
-      market: { id: '101', question: 'Will tariffs rise before July?', url: 'https://polymarket.com/market/tariff-market' },
+      market: { id: '101', question: 'Will tariffs rise before July?', url: 'https://polymarket.com/market/tariff-market', endDate: '2026-06-01T00:00:00.000Z' },
       match: {
         confidence: 87,
         direction: '利好',
@@ -43,18 +43,22 @@ function sampleProof(extra = {}) {
     marketId: '101',
     marketQuestion: 'Will tariffs rise before July?',
     marketUrl: 'https://polymarket.com/market/tariff-market',
+    marketEndDate: '2026-06-01T00:00:00.000Z',
     confidence: 87,
     direction: '利好',
+    lifecycleStatus: 'active',
+    outcomeStatus: 'pending',
+    trackRecordNote: 'Market is still open, so this signal is being tracked.',
     createdAt: '2026-05-16T08:00:00.000Z',
     ...extra,
   };
 }
 
-function sampleStoredSignal() {
+function sampleStoredSignal(extra = {}) {
   return {
     schemaVersion: 1,
     source: { title: 'Tariff update', url: 'https://example.com/news/tariff' },
-    market: { id: '101', question: 'Will tariffs rise before July?', url: 'https://polymarket.com/market/tariff-market' },
+    market: { id: '101', question: 'Will tariffs rise before July?', url: 'https://polymarket.com/market/tariff-market', endDate: '2026-06-01T00:00:00.000Z' },
     match: {
       confidence: 87,
       direction: '利好',
@@ -67,6 +71,7 @@ function sampleStoredSignal() {
     },
     generatedAt: '2026-05-16T08:00:00.000Z',
     metadata: {},
+    ...extra,
   };
 }
 
@@ -125,6 +130,8 @@ test('createZeroGProofService publishes signal through storage and chain', async
   assert.equal(chainCalls[0].storageUri, '0g://root-hash');
   assert.equal(proof.txHash, '0xchain');
   assert.equal(proof.marketQuestion, 'Will tariffs rise before July?');
+  assert.equal(proof.lifecycleStatus, 'active');
+  assert.equal(proof.outcomeStatus, 'pending');
 });
 
 test('createZeroGProofService rejects invalid signal source URL', async () => {
@@ -201,7 +208,50 @@ test('createZeroGProofService rebuilds proofs from chain anchors and 0G storage'
   assert.equal(list[0].storageUri, '0g://root');
   assert.equal(list[0].rootHash, 'root');
   assert.equal(list[0].marketQuestion, 'Will tariffs rise before July?');
+  assert.equal(list[0].lifecycleStatus, 'active');
   assert.equal(detail.txHash, '0xchain');
+});
+
+test('createZeroGProofService marks expired signals for track record', async () => {
+  const service = createZeroGProofService({
+    now: () => Date.parse('2026-07-01T00:00:00.000Z'),
+    storageClient: {
+      async saveSignal() { throw new Error('storage should not run'); },
+      async loadSignal() { return sampleStoredSignal(); },
+    },
+    chainClient: {
+      async registerSignalHash() { throw new Error('chain should not run'); },
+      async listSignalAnchors() {
+        return [sampleProof({ blockNumber: 100, logIndex: 0 })];
+      },
+      async findSignalAnchor() { return null; },
+    },
+  });
+
+  const list = await service.listProofs(10);
+  assert.equal(list[0].lifecycleStatus, 'expired');
+  assert.equal(list[0].outcomeStatus, 'unknown');
+});
+
+test('createZeroGProofService marks scored signals as resolved', async () => {
+  const service = createZeroGProofService({
+    now: () => Date.parse('2026-07-01T00:00:00.000Z'),
+    storageClient: {
+      async saveSignal() { throw new Error('storage should not run'); },
+      async loadSignal() { return sampleStoredSignal({ metadata: { outcomeStatus: 'hit' } }); },
+    },
+    chainClient: {
+      async registerSignalHash() { throw new Error('chain should not run'); },
+      async listSignalAnchors() {
+        return [sampleProof({ blockNumber: 100, logIndex: 0 })];
+      },
+      async findSignalAnchor() { return null; },
+    },
+  });
+
+  const list = await service.listProofs(10);
+  assert.equal(list[0].lifecycleStatus, 'resolved');
+  assert.equal(list[0].outcomeStatus, 'hit');
 });
 
 test('createZeroGProofApp exposes health and proof page', async () => {
@@ -226,7 +276,7 @@ test('createZeroGProofApp exposes health and proof page', async () => {
   assert.equal(health.status, 200);
   assert.equal((await health.json()).service, 'zero-g-proof');
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Storage URI/);
+  assert.match(await page.text(), /Signal Ledger/);
 });
 
 test('createZeroGProofApp protects publish endpoint', async () => {

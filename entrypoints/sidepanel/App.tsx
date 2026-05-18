@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { browser } from 'wxt/browser';
 import { EXTENSION_NAME } from '../../src/shared/manifest';
-import { POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY } from '../../src/shared/config';
+import { POLYMARKET_PORTFOLIO_ADDRESS_STORAGE_KEY, ZERO_G_PROOF_API_BASE_URL } from '../../src/shared/config';
 import { SHOW_PAYMENT_SURFACE, SHOW_WALLET_SURFACE } from '../../src/shared/feature-flags';
 import { ANALYSIS_MESSAGE_TYPES, AUTH_MESSAGE_TYPES, CORE_MESSAGE_TYPES, GHOST_MESSAGE_TYPES, MEMBERSHIP_MESSAGE_TYPES, PAGE_MESSAGE_TYPES, POLYMARKET_MESSAGE_TYPES, USAGE_PACK_MESSAGE_TYPES, WALLET_MESSAGE_TYPES } from '../../src/shared/messages';
-import type { AnalysisMatch, AnalysisResult, PageContext } from '../../src/shared/analysis';
+import type { AnalysisMatch, AnalysisResult, PageContext, ZeroGProofStatus, ZeroGProofSummary } from '../../src/shared/analysis';
 import { isNoOpportunityAnalysisError } from '../../src/shared/analysis';
 import type { AuthUser } from '../../src/shared/auth';
 import type { GhostStatePayload } from '../../src/background/ghost-mode';
@@ -59,6 +59,7 @@ import {
 } from './view-model';
 import { AuthLoading, AuthPanel, UserProfile, type AuthStatus } from './auth-panel';
 import { SettingsView } from './settings-view';
+import { ZeroGProofStrip } from './zero-g-proof-view';
 
 type ChannelStatus = 'checking' | 'ready' | 'error';
 type ActiveTabInfo = { id: number; title: string };
@@ -152,6 +153,11 @@ function statusTone(status: AnalysisStatus | ChannelStatus) {
   if (status === 'loading' || status === 'checking') return 'active';
   if (status === 'blocked') return 'muted';
   return 'neutral';
+}
+
+// Proof 入口
+function buildProofPageUrl(url: string) {
+  return `${url.replace(/\/+$/, '')}/0g-proof`;
 }
 
 // 美元格式
@@ -520,7 +526,12 @@ function FeedView({
   error,
   portfolioSnapshot,
   lastTitle,
+  zeroGProofStatus,
+  zeroGProofs,
+  zeroGProofError,
+  zeroGProofPageUrl,
   onAnalyze,
+  onOpenProof,
 }: {
   channelStatus: ChannelStatus;
   analysisStatus: AnalysisStatus;
@@ -529,7 +540,12 @@ function FeedView({
   error: string;
   portfolioSnapshot: PortfolioSnapshot | null;
   lastTitle: string;
+  zeroGProofStatus: ZeroGProofStatus;
+  zeroGProofs: ZeroGProofSummary[];
+  zeroGProofError: string;
+  zeroGProofPageUrl: string;
   onAnalyze: () => void;
+  onOpenProof: () => void;
 }) {
   return (
     <section id="view-feed" role="tabpanel" aria-labelledby="tab-feed">
@@ -542,14 +558,23 @@ function FeedView({
             <p className="mb-0 mt-2 line-clamp-2 max-w-[42ch] overflow-hidden text-[13px] leading-[1.4] text-(--ink-3)">{lastTitle || '尚未读取当前页面'}</p>
           </div>
         </div>
-        <button
-          type="button"
-          className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-transparent bg-(--ink-1) px-[13px] text-[13px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
-          onClick={onAnalyze}
-          disabled={analysisStatus === 'loading'}
-        >
-          {analysisStatus === 'loading' ? '分析中' : '分析当前页'}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-(--rule) bg-(--paper) px-[11px] text-[13px] font-semibold text-(--ink-2) transition-colors duration-160 hover:bg-(--surface) hover:text-(--ink-1)"
+            onClick={onOpenProof}
+          >
+            Proof
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-10 cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-transparent bg-(--ink-1) px-[13px] text-[13px] font-semibold text-(--paper) transition-colors duration-160 hover:bg-(--accent) disabled:cursor-progress disabled:bg-(--ink-4)"
+            onClick={onAnalyze}
+            disabled={analysisStatus === 'loading'}
+          >
+            {analysisStatus === 'loading' ? '分析中' : '分析当前页'}
+          </button>
+        </div>
       </header>
 
       {/* <div className="flex min-h-11 items-center gap-2 overflow-x-auto border-b border-(--rule) px-4" aria-label="运行状态">
@@ -559,6 +584,13 @@ function FeedView({
         <span className="shrink-0 text-xs tabular-nums text-(--ink-3)">{summarizeAnalysis(result)}</span>
       </div> */}
 
+      <ZeroGProofStrip
+        status={zeroGProofStatus}
+        proofs={zeroGProofs}
+        error={zeroGProofError}
+        proofPageUrl={zeroGProofPageUrl}
+        onOpenProof={onOpenProof}
+      />
       <ResultBoard status={analysisStatus} result={result} error={error} portfolioSnapshot={portfolioSnapshot} />
     </section>
   );
@@ -1217,6 +1249,10 @@ export function App() {
     setAnalysisResult({
       totalMarkets: payload.totalMarkets,
       matches: payload.matches,
+      zeroGProofStatus: payload.zeroGProofStatus,
+      zeroGProofs: payload.zeroGProofs,
+      zeroGProofError: payload.zeroGProofError,
+      zeroGProofPageUrl: payload.zeroGProofPageUrl,
     });
   }
 
@@ -1439,6 +1475,12 @@ export function App() {
       setAnalysisResult(null);
       setAnalysisStatus('error');
     }
+  }
+
+  // 打开证明
+  function handleOpenProofPage() {
+    const proofPageUrl = analysisResult?.zeroGProofPageUrl || buildProofPageUrl(ZERO_G_PROOF_API_BASE_URL);
+    void browser.tabs.create({ url: proofPageUrl });
   }
 
   // 切换幽灵
@@ -1875,7 +1917,12 @@ export function App() {
             error={analysisError}
             portfolioSnapshot={portfolioSnapshot}
             lastTitle={lastTitle}
+            zeroGProofStatus={analysisResult?.zeroGProofStatus || 'idle'}
+            zeroGProofs={analysisResult?.zeroGProofs || []}
+            zeroGProofError={analysisResult?.zeroGProofError || ''}
+            zeroGProofPageUrl={analysisResult?.zeroGProofPageUrl || buildProofPageUrl(ZERO_G_PROOF_API_BASE_URL)}
             onAnalyze={handleAnalyzeClick}
+            onOpenProof={handleOpenProofPage}
           />
         </div>
         <div className="tab-panel-shell" hidden={activeTab !== 'profile'}>

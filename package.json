@@ -3,9 +3,10 @@
   "type": "module",
   "version": "1.0.2",
   "description": "",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
     "dev": "wxt",
+    "dev:0g": "node --import ./tests/register-ts-extensionless-loader.mjs scripts/dev-zero-g.ts",
     "dev:manual": "WXT_MANUAL=1 wxt",
     "dev:extension": "wxt",
     "dev:extension:firefox": "wxt -b firefox",

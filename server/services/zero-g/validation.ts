@@ -72,6 +72,18 @@ function readGeneratedAt(value: unknown, now: () => number): string {
   return date.toISOString();
 }
 
+// 读取结束
+function readOptionalDate(value: unknown, label: string): string | null {
+  const text = clipText(value, 80);
+  if (!text) return null;
+
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) {
+    throw new ProofHttpError(400, `${label} must be a valid date.`);
+  }
+  return date.toISOString();
+}
+
 // 限制数量
 export function readProofLimit(value: unknown): number {
   return clampInt(value, 50, 1, 200);
@@ -99,6 +111,7 @@ export function readSignalPayload(body: PublishSignalRequest, now: () => number)
       id: requiredText(market.id, 120, 'signal.market.id'),
       question: requiredText(market.question, 500, 'signal.market.question'),
       url: requiredHttpUrl(market.url, 'signal.market.url'),
+      endDate: readOptionalDate(market.endDate, 'signal.market.endDate'),
     },
     match: {
       confidence: readConfidence(match.confidence),

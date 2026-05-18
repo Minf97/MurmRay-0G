@@ -9,9 +9,12 @@ import {
   normalizeAnalysisResult,
   type AnalysisResult,
   type PageContext,
+  type ZeroGProofStatus,
+  type ZeroGProofSummary,
 } from '../shared/analysis';
 import { buildAnalysisCacheKey, createAnalysisCache } from './analysis-cache';
 import { invokePolymarketAnalysis } from './api';
+import { publishZeroGProofsForAnalysis, type ZeroGPublishState } from './zero-g-proof';
 import type { Browser } from 'wxt/browser';
 
 export type GhostStatus = 'idle' | 'analyzing' | 'opportunity' | 'no_opportunity' | 'blocked' | 'error';
@@ -28,6 +31,10 @@ export type GhostStatePayload = {
   requestId: string;
   totalMarkets: number;
   matches: AnalysisResult['matches'];
+  zeroGProofStatus: ZeroGProofStatus;
+  zeroGProofs: ZeroGProofSummary[];
+  zeroGProofError: string;
+  zeroGProofPageUrl: string;
   error: string;
   cached: boolean;
   updatedAt: string;
@@ -41,6 +48,7 @@ type GhostStorage = {
 type GhostControllerOptions = {
   browser: Browser;
   analyzePage?: (pageContext: PageContext) => Promise<AnalysisResult>;
+  publishZeroGProofs?: (pageContext: PageContext, result: AnalysisResult) => Promise<ZeroGPublishState>;
   consumeAnalysisQuota?: () => Promise<unknown>;
   now?: () => number;
   createRequestId?: () => string;
@@ -94,6 +102,10 @@ export function createGhostPayload(
     requestId: options.requestId || '',
     totalMarkets: result.totalMarkets,
     matches: result.matches,
+    zeroGProofStatus: result.zeroGProofStatus || 'idle',
+    zeroGProofs: result.zeroGProofs || [],
+    zeroGProofError: result.zeroGProofError || '',
+    zeroGProofPageUrl: result.zeroGProofPageUrl || '',
     error: options.error || '',
     cached: Boolean(options.cached),
     updatedAt: options.updatedAt || new Date().toISOString(),
@@ -105,6 +117,7 @@ export function createGhostModeController(options: GhostControllerOptions) {
   const browser = options.browser;
   const storage = browser.storage.local as GhostStorage;
   const analyzePage = options.analyzePage || invokePolymarketAnalysis;
+  const publishZeroGProofs = options.publishZeroGProofs || publishZeroGProofsForAnalysis;
   const consumeAnalysisQuota = options.consumeAnalysisQuota || (async () => undefined);
   const now = options.now || (() => Date.now());
   const createRequestId = options.createRequestId || (() => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
@@ -194,14 +207,22 @@ export function createGhostModeController(options: GhostControllerOptions) {
 
     const promise = (async () => {
       await consumeAnalysisQuota();
-      return normalizeAnalysisResult(await analyzePage(pageContext));
+      const result = normalizeAnalysisResult(await analyzePage(pageContext));
+      const proofState = await publishZeroGProofs(pageContext, result);
+      const resultWithProofs = {
+        ...result,
+        zeroGProofStatus: proofState.status,
+        zeroGProofs: proofState.proofs,
+        zeroGProofError: proofState.error,
+        zeroGProofPageUrl: proofState.proofPageUrl,
+      };
+      await analysisCache.set(pageKey, resultWithProofs);
+      return resultWithProofs;
     })();
 
     inFlightByPageKey.set(pageKey, promise);
     try {
-      const result = await promise;
-      await analysisCache.set(pageKey, result);
-      return { result, cached: false };
+      return { result: await promise, cached: false };
     } finally {
       inFlightByPageKey.delete(pageKey);
     }

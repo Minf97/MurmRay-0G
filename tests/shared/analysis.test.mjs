@@ -5,6 +5,7 @@ import {
   isNoOpportunityAnalysisError,
   isBlacklistedUrl,
   mergeMatches,
+  normalizeAnalysisResult,
 } from '../../src/shared/analysis';
 
 test('buildPageContext trims and validates input', () => {
@@ -45,7 +46,7 @@ test('isBlacklistedUrl filters obvious pages', () => {
 
 test('mergeMatches deduplicates markets', () => {
   const merged = mergeMatches([
-    { marketId: 1, question: 'A', confidence: 20, direction: 'yes', reason: 'a', slug: 'a' },
+    { marketId: 1, question: 'A', confidence: 20, direction: 'yes', reason: 'a', slug: 'a', marketEndDate: '2026-06-01T00:00:00.000Z' },
     { marketId: 1, question: 'A+', confidence: 30, direction: 'yes', reason: 'b', marketUrl: 'https://polymarket.com/market/a' },
     { marketId: 2, question: 'B', confidence: 10, direction: 'no', reason: 'c', url: 'https://polymarket.com/market/b' },
   ]);
@@ -54,5 +55,29 @@ test('mergeMatches deduplicates markets', () => {
   assert.equal(merged[0].marketId, 1);
   assert.equal(merged[0].confidence, 30);
   assert.equal(merged[0].question, 'A+');
+  assert.equal(merged[0].marketEndDate, '2026-06-01T00:00:00.000Z');
   assert.equal(merged[1].marketId, 2);
+});
+
+test('normalizeAnalysisResult keeps zero-g proof metadata', () => {
+  const result = normalizeAnalysisResult({
+    totalMarkets: 1,
+    matches: [],
+    zeroGProofStatus: 'ready',
+    zeroGProofPageUrl: 'https://proof.example.com/0g-proof',
+    zeroGProofs: [
+      {
+        signalHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        storageUri: '0g://root',
+        txHash: '0xchain',
+        lifecycleStatus: 'active',
+        outcomeStatus: 'pending',
+      },
+    ],
+  });
+
+  assert.equal(result.zeroGProofStatus, 'ready');
+  assert.equal(result.zeroGProofPageUrl, 'https://proof.example.com/0g-proof');
+  assert.equal(result.zeroGProofs[0].storageUri, '0g://root');
+  assert.equal(result.zeroGProofs[0].lifecycleStatus, 'active');
 });

@@ -255,6 +255,7 @@ test('createAnalysisService runs analyze_page with insforge vector search', asyn
   assert.equal(result.prefetchCount, 500);
   assert.equal(result.matches.length, 1);
   assert.equal(result.matches[0].marketId, 1);
+  assert.equal(result.matches[0].marketEndDate, '2099-01-01T00:00:00.000Z');
   assert.equal(result.topVectorCandidates[0].marketId, 1);
   assert.equal(result.topVectorCandidates[0].distance, 0.1);
   assert.equal(rpcCalls[0].fn, 'match_polymarket_market_embeddings');

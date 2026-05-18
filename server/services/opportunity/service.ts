@@ -10,6 +10,7 @@ import { countOpenMarkets, createInsforgeClient, fetchVectorCandidates } from '.
 import { buildPolymarketUrl } from './market';
 import { requestEmbeddings, requestMarketMatches, resolveOpenRouterConfig, summarizePage } from './openrouter';
 import { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector';
+import { publishZeroGProofs } from './zero-g-proof';
 import type { AnalysisRequest, CreateAnalysisServiceOptions, Market, MatchResult, PageContext } from './types';
 
 export { mergeCandidateLists } from './insforge';
@@ -81,6 +82,7 @@ function mapAiMatches(rawMatches: Record<string, unknown>[], markets: Market[]):
         direction: normalizeDirection(item.direction),
         reason: clipText(item.reason, 120) || '模型未给出具体理由。',
         marketUrl: buildPolymarketUrl(market.url, market.slug),
+        marketEndDate: market.endDate,
       };
     })
     .filter((item): item is MatchResult => Boolean(item));
@@ -163,8 +165,12 @@ export function createAnalysisService(options: CreateAnalysisServiceOptions = {}
     const candidates = await fetchVectorCandidates(insforgeClient, queryEmbeddings, topK, prefetchCount);
     const vectorRecallMs = now() - startedAt - summarizeMs - queryEmbeddingMs;
 
+    const judgeStartedAt = now();
     const matches = dedupeMatches(await findMatchesForChunk(summaryData, candidates));
-    const judgeMatchesMs = now() - startedAt - summarizeMs - queryEmbeddingMs - vectorRecallMs;
+    const judgeMatchesMs = now() - judgeStartedAt;
+    const proofStartedAt = now();
+    const zeroGProofState = await publishZeroGProofs(page, summaryData, matches, { env, fetchImpl, now });
+    const zeroGProofMs = now() - proofStartedAt;
 
     return {
       action: 'analyze_page',
@@ -180,11 +186,16 @@ export function createAnalysisService(options: CreateAnalysisServiceOptions = {}
         distance: item.distance,
       })),
       matches,
+      zeroGProofStatus: zeroGProofState.status,
+      zeroGProofs: zeroGProofState.proofs,
+      zeroGProofError: zeroGProofState.error,
+      zeroGProofPageUrl: zeroGProofState.proofPageUrl,
       timingMs: {
         summarizeMs,
         queryEmbeddingMs,
         vectorRecallMs,
         judgeMatchesMs,
+        zeroGProofMs,
         totalMs: now() - startedAt,
       },
     };

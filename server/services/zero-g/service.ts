@@ -2,6 +2,7 @@ import { canonicalize, hashCanonicalJson } from './canonical';
 import { createZeroGChainClient } from './chain';
 import { createZeroGStorageClient } from './storage';
 import { readProofLimit, readSignalPayload } from './validation';
+import { resolveTrackRecordState } from './ledger';
 import type {
   ChainSignalAnchor,
   CreateZeroGProofServiceOptions,
@@ -19,7 +20,8 @@ function readRootHash(storageUri: string): string {
 }
 
 // 组装证明
-function buildProofFromAnchor(anchor: ChainSignalAnchor, signal: SignalPayload): SignalProof {
+function buildProofFromAnchor(anchor: ChainSignalAnchor, signal: SignalPayload, nowMs: number): SignalProof {
+  const trackRecord = resolveTrackRecordState(signal, nowMs);
   return {
     signalHash: anchor.signalHash,
     storageUri: anchor.storageUri,
@@ -34,8 +36,12 @@ function buildProofFromAnchor(anchor: ChainSignalAnchor, signal: SignalPayload):
     marketId: signal.market.id,
     marketQuestion: signal.market.question,
     marketUrl: signal.market.url,
+    marketEndDate: signal.market.endDate,
     confidence: signal.match.confidence,
     direction: signal.match.direction,
+    lifecycleStatus: trackRecord.lifecycleStatus,
+    outcomeStatus: trackRecord.outcomeStatus,
+    trackRecordNote: trackRecord.trackRecordNote,
     createdAt: signal.generatedAt,
   };
 }
@@ -69,6 +75,7 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
       signalHash,
       storageUri: storageProof.storageUri,
     });
+    const trackRecord = resolveTrackRecordState(signal, now());
 
     const proof: SignalProof = {
       signalHash,
@@ -79,8 +86,12 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
       marketId: signal.market.id,
       marketQuestion: signal.market.question,
       marketUrl: signal.market.url,
+      marketEndDate: signal.market.endDate,
       confidence: signal.match.confidence,
       direction: signal.match.direction,
+      lifecycleStatus: trackRecord.lifecycleStatus,
+      outcomeStatus: trackRecord.outcomeStatus,
+      trackRecordNote: trackRecord.trackRecordNote,
       createdAt: new Date(now()).toISOString(),
     };
 
@@ -91,7 +102,7 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
   async function listProofs(limitInput: unknown): Promise<SignalProof[]> {
     const anchors = await getChainClient().listSignalAnchors(readProofLimit(limitInput));
     return Promise.all(anchors.map(async (anchor) => (
-      buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri))
+      buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri), now())
     )));
   }
 
@@ -99,7 +110,7 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
   async function findProof(signalHash: string): Promise<SignalProof | null> {
     const anchor = await getChainClient().findSignalAnchor(signalHash);
     if (!anchor) return null;
-    return buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri));
+    return buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri), now());
   }
 
   return {
