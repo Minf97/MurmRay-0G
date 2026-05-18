@@ -1,5 +1,5 @@
-import { clipText } from './config';
-import type { Market, PageContext, SummaryData } from './types';
+import { clipText } from './config.js';
+import type { Market, PageContext, SummaryData } from './types.js';
 
 // 构建检索词
 export function buildQueryTexts(page: Partial<PageContext>, summary: Partial<SummaryData>): string[] {

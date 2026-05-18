@@ -1,4 +1,4 @@
-import { clampInt, sleep } from '../shared/config';
+import { clampInt, sleep } from '../shared/config.js';
 import {
   DEFAULT_FULL_MAX_PAGES,
   DEFAULT_FULL_PAGE_LIMIT,
@@ -12,17 +12,17 @@ import {
   MAX_MARKET_PAGE_LIMIT,
   MAX_NO_CHANGE_STOP_PAGES,
   MAX_OVERLAP_SECONDS,
-} from './config';
+} from './config.js';
 import {
   cleanupStoppedMarkets,
   createSyncInsforgeClient,
   getWatermark,
   setWatermark,
-} from './db';
-import { fetch1024ActiveMarkets, fetch1024MarketsPage, map1024Market } from './ex1024';
-import { fetchGammaEventsPage, fetchGammaMarketsPage, mapGammaMarket } from './gamma';
-import { persistMarketChanges } from './rows';
-import type { CreateSyncServiceOptions, SyncInsforgeClient, SyncMarketRow, SyncRequest } from './types';
+} from './db.js';
+import { fetch1024ActiveMarkets, fetch1024MarketsPage, map1024Market } from './ex1024.js';
+import { fetchGammaEventsPage, fetchGammaMarketsPage, mapGammaMarket } from './gamma.js';
+import { persistMarketChanges } from './rows.js';
+import type { CreateSyncServiceOptions, SyncInsforgeClient, SyncMarketRow, SyncRequest } from './types.js';
 
 // 时间戳毫秒
 function timestampMs(input: string | null): number {

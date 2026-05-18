@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serve } from '@hono/node-server';
-import { createZeroGProofApp } from '../server/services/zero-g/app';
+import { createZeroGProofApp } from '../server/services/zero-g/app.js';
 
 const DEFAULT_PORT = 8790;
 const HOST = '127.0.0.1';

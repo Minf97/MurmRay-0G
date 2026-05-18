@@ -1,7 +1,7 @@
-import { chunkArray } from '../shared/config';
-import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge';
-import { EXISTING_FETCH_CHUNK, UPSERT_CHUNK_SIZE, WATERMARK_STATE_KEY } from './config';
-import type { ExistingMarketRow, ServerEnv, SyncInsforgeClient, SyncMarketRow } from './types';
+import { chunkArray } from '../shared/config.js';
+import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge.js';
+import { EXISTING_FETCH_CHUNK, UPSERT_CHUNK_SIZE, WATERMARK_STATE_KEY } from './config.js';
+import type { ExistingMarketRow, ServerEnv, SyncInsforgeClient, SyncMarketRow } from './types.js';
 
 // 建客户端
 export function createSyncInsforgeClient(env: ServerEnv): SyncInsforgeClient {

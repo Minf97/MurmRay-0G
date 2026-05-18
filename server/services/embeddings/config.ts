@@ -7,7 +7,7 @@ export {
   chunkArray,
   clampInt,
   sleep,
-} from '../shared/config';
+} from '../shared/config.js';
 
 export const DEFAULT_CONCURRENCY = 40;
 export const MAX_CONCURRENCY = 200;

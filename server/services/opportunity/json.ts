@@ -1,4 +1,4 @@
-import { clipText } from './config';
+import { clipText } from './config.js';
 
 // 解析对象
 function parseObject(text: string): Record<string, unknown> | null {

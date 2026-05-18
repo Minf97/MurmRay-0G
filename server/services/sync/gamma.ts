@@ -1,6 +1,6 @@
-import { sleep } from '../shared/config';
-import { GAMMA_API_BASE, USER_AGENT } from './config';
-import type { FetchImpl, SyncMarketRow } from './types';
+import { sleep } from '../shared/config.js';
+import { GAMMA_API_BASE, USER_AGENT } from './config.js';
+import type { FetchImpl, SyncMarketRow } from './types.js';
 
 // 读文本
 function readText(input: unknown): string | null {

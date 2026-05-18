@@ -1,4 +1,4 @@
-import type { ServerEnv } from '../shared/insforge';
+import type { ServerEnv } from '../shared/insforge.js';
 
 export type { ServerEnv };
 export type FetchImpl = typeof fetch;

@@ -1,5 +1,5 @@
-import { clipText } from './config';
-import type { FetchImpl, MatchResult, PageContext, ServerEnv, SummaryData } from './types';
+import { clipText } from './config.js';
+import type { FetchImpl, MatchResult, PageContext, ServerEnv, SummaryData } from './types.js';
 
 export type ZeroGProofStatus = 'idle' | 'skipped' | 'ready';
 

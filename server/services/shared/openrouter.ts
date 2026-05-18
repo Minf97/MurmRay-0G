@@ -3,8 +3,8 @@ import {
   DEFAULT_OPENROUTER_EMBED_MODEL,
   DEFAULT_OPENROUTER_HTTP_REFERER,
   OPENROUTER_API_BASE_URL,
-} from './config';
-import type { ServerEnv } from './insforge';
+} from './config.js';
+import type { ServerEnv } from './insforge.js';
 
 export interface OpenRouterEmbeddingConfig {
   apiBaseUrl: string;

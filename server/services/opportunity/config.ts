@@ -8,7 +8,7 @@ export {
   chunkArray,
   clampInt,
   clipText,
-} from '../shared/config';
+} from '../shared/config.js';
 
 export const DEFAULT_TOP_K = 100;
 export const DEFAULT_PREFETCH_COUNT = 1200;

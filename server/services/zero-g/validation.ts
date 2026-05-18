@@ -1,5 +1,5 @@
-import { clampInt, clipText } from '../shared/config';
-import { ProofHttpError, type PublishSignalRequest, type SignalPayload } from './types';
+import { clampInt, clipText } from '../shared/config.js';
+import { ProofHttpError, type PublishSignalRequest, type SignalPayload } from './types.js';
 
 const MAX_EVIDENCE_ITEMS = 8;
 

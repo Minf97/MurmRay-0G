@@ -1,4 +1,4 @@
-import type { SignalLifecycleStatus, SignalOutcomeStatus, SignalPayload } from './types';
+import type { SignalLifecycleStatus, SignalOutcomeStatus, SignalPayload } from './types.js';
 
 export interface TrackRecordState {
   lifecycleStatus: SignalLifecycleStatus;

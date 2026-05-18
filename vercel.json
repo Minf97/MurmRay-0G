@@ -1,0 +1,9 @@
+{
+  "framework": "hono",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/"
+    }
+  ]
+}

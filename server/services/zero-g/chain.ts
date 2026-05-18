@@ -1,12 +1,12 @@
 import { Contract, Interface, JsonRpcProvider, Wallet, id } from 'ethers';
-import { clampInt, clipText } from '../shared/config';
+import { clampInt, clipText } from '../shared/config.js';
 import type {
   ChainProof,
   ChainRegisterInput,
   ChainSignalAnchor,
   ServerEnv,
   ZeroGChainClient,
-} from './types';
+} from './types.js';
 
 export const SIGNAL_REGISTRY_ABI = [
   'function registerSignal(bytes32 signalHash,string storageUri) external',

@@ -1,5 +1,5 @@
-import { fetchExistingMarkets, marketRowsDifferent, upsertMarketsAndJobs } from './db';
-import type { SyncInsforgeClient, SyncMarketRow } from './types';
+import { fetchExistingMarkets, marketRowsDifferent, upsertMarketsAndJobs } from './db.js';
+import type { SyncInsforgeClient, SyncMarketRow } from './types.js';
 
 export interface MarketChangeTotals {
   newMarkets: number;

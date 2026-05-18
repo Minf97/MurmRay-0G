@@ -6,9 +6,9 @@ import {
   DEFAULT_OPENROUTER_MODEL,
   OPENROUTER_API_BASE_URL,
   clipText,
-} from '../shared/config';
-import { parseJsonLoose, readStringArray } from './json';
-import type { FetchImpl, PageContext, ServerEnv, SummaryData } from './types';
+} from '../shared/config.js';
+import { parseJsonLoose, readStringArray } from './json.js';
+import type { FetchImpl, PageContext, ServerEnv, SummaryData } from './types.js';
 
 interface ChatMessage {
   role: 'system' | 'user';
@@ -32,7 +32,7 @@ interface RequestEmbeddingOptions {
   model: string;
   httpReferer: string;
   appTitle: string;
-  expectedDimensions?: string;
+  expectedDimensions?: string | number;
   texts: string[];
 }
 
@@ -71,7 +71,7 @@ export function resolveOpenRouterConfig(env: ServerEnv): {
   embedModel: string;
   httpReferer: string;
   appTitle: string;
-  embedDimensions?: string;
+  embedDimensions?: string | number;
 } {
   return {
     apiBaseUrl: env.OPENROUTER_API_BASE_URL || OPENROUTER_API_BASE_URL,

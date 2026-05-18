@@ -8,7 +8,7 @@ import {
   MAX_DURATION_MS,
   MAX_RECONCILE_LIMIT,
   clampInt,
-} from './config';
+} from './config.js';
 import {
   applyEmbeddingResults,
   claimEmbeddingJobs,
@@ -16,8 +16,8 @@ import {
   enqueueMissingActiveMarkets,
   markJobsDone,
   markJobsFailed,
-} from './insforge';
-import { callEmbeddingSingle, resolveEmbeddingOptions, toVectorLiteral } from './openrouter';
+} from './insforge.js';
+import { callEmbeddingSingle, resolveEmbeddingOptions, toVectorLiteral } from './openrouter.js';
 import type {
   CreateEmbeddingWorkerOptions,
   EmbeddingApplyRow,
@@ -25,7 +25,7 @@ import type {
   EmbeddingJob,
   EmbeddingOptions,
   EmbeddingWorkerRequest,
-} from './types';
+} from './types.js';
 
 interface ProcessResult {
   succeeded: number;

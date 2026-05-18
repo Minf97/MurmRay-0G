@@ -1,10 +1,7 @@
-import { writeFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { Wallet, JsonRpcProvider } from 'ethers';
-import { clipText } from '../shared/config';
-import { readStoredSignalPayload } from './validation';
-import type { ServerEnv, SignalPayload, StorageProof, StorageSaveInput, ZeroGStorageClient } from './types';
+import { clipText } from '../shared/config.js';
+import { readStoredSignalPayload } from './validation.js';
+import type { ServerEnv, SignalPayload, StorageProof, StorageSaveInput, ZeroGStorageClient } from './types.js';
 
 interface ZeroGStorageConfig {
   indexerRpc: string;
@@ -64,31 +61,20 @@ export function createZeroGStorageClient(env: ServerEnv): ZeroGStorageClient {
       if (!config.evmRpc) throw new Error('Missing ZERO_G_EVM_RPC');
       if (!config.privateKey) throw new Error('Missing ZERO_G_PRIVATE_KEY');
 
-      const { Indexer, ZgFile } = await import('@0gfoundation/0g-storage-ts-sdk');
-      const filePath = join(tmpdir(), `murmray-signal-${input.signalHash.slice(2)}.json`);
-      await writeFile(filePath, input.payload, 'utf8');
+      const { Indexer, MemData } = await import('@0gfoundation/0g-storage-ts-sdk');
+      const file = new MemData(new TextEncoder().encode(input.payload));
+      const [tree, treeError] = await file.merkleTree();
+      if (treeError) throw treeError;
 
-      const file = await ZgFile.fromFilePath(filePath);
-      try {
-        const [tree, treeError] = await file.merkleTree();
-        if (treeError) throw treeError;
+      const rootHash = tree?.rootHash();
+      if (!rootHash) throw new Error('0G Storage root hash is empty.');
 
-        const rootHash = tree?.rootHash();
-        if (!rootHash) throw new Error('0G Storage root hash is empty.');
+      const provider = new JsonRpcProvider(config.evmRpc);
+      const signer = new Wallet(config.privateKey, provider);
+      const [result, uploadError] = await new Indexer(config.indexerRpc).upload(file, config.evmRpc, signer);
+      if (uploadError) throw uploadError;
 
-        const provider = new JsonRpcProvider(config.evmRpc);
-        const signer = new Wallet(config.privateKey, provider);
-        const [result, uploadError] = await new Indexer(config.indexerRpc).upload(file, config.evmRpc, signer);
-        if (uploadError) throw uploadError;
-
-        return readUploadResult(result, rootHash);
-      } finally {
-        try {
-          await file.close();
-        } finally {
-          await rm(filePath, { force: true });
-        }
-      }
+      return readUploadResult(result, rootHash);
     },
     async loadSignal(storageUri: string): Promise<SignalPayload> {
       const { Indexer } = await import('@0gfoundation/0g-storage-ts-sdk');

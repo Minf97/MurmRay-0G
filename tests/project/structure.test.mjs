@@ -23,6 +23,9 @@ test('phase0 baseline files exist', async () => {
     'src/shared/config.ts',
     'src/shared/manifest.ts',
     'src/shared/messages.ts',
+    'server.ts',
+    'worker.ts',
+    'wrangler.jsonc',
     'server/services/opportunity/service.ts',
     'server/services/opportunity/insforge.ts',
     'server/services/opportunity/openrouter.ts',
@@ -31,6 +34,7 @@ test('phase0 baseline files exist', async () => {
     'server/services/embeddings/openrouter.ts',
     'server/services/shared/config.ts',
     'server/services/shared/openrouter.ts',
+    'server/app.ts',
     'server/services/sync/service.ts',
     'server/services/sync/gamma.ts',
     'server/services/sync/db.ts',
@@ -39,5 +43,5 @@ test('phase0 baseline files exist', async () => {
   ];
 
   await Promise.all(requiredPaths.map(assertPathExists));
-  assert.equal(requiredPaths.length, 26);
+  assert.equal(requiredPaths.length, 30);
 });

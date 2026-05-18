@@ -21,6 +21,5 @@ export function createInsforgeClient<T>(env: ServerEnv): T {
     anonKey,
     edgeFunctionToken: anonKey,
     autoRefreshToken: false,
-    persistSession: false,
   }) as unknown as T;
 }

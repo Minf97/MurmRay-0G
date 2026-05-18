@@ -1,5 +1,5 @@
-import { clipText } from './config';
-import type { Market, VectorCandidate } from './types';
+import { clipText } from './config.js';
+import type { Market, VectorCandidate } from './types.js';
 
 type InsforgeMarketRow = Omit<VectorCandidate, 'acceptingOrders' | 'enableOrderBook' | 'vectorScore'>;
 

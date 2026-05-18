@@ -5,17 +5,17 @@ import {
   chunkArray,
   clampInt,
   clipText,
-} from './config';
-import { countOpenMarkets, createInsforgeClient, fetchVectorCandidates } from './insforge';
-import { buildPolymarketUrl } from './market';
-import { requestEmbeddings, requestMarketMatches, resolveOpenRouterConfig, summarizePage } from './openrouter';
-import { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector';
-import { publishZeroGProofs } from './zero-g-proof';
-import type { AnalysisRequest, CreateAnalysisServiceOptions, Market, MatchResult, PageContext } from './types';
+} from './config.js';
+import { countOpenMarkets, createInsforgeClient, fetchVectorCandidates } from './insforge.js';
+import { buildPolymarketUrl } from './market.js';
+import { requestEmbeddings, requestMarketMatches, resolveOpenRouterConfig, summarizePage } from './openrouter.js';
+import { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector.js';
+import { publishZeroGProofs } from './zero-g-proof.js';
+import type { AnalysisRequest, CreateAnalysisServiceOptions, Market, MatchResult, PageContext } from './types.js';
 
-export { mergeCandidateLists } from './insforge';
-export { parseJsonLoose } from './json';
-export { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector';
+export { mergeCandidateLists } from './insforge.js';
+export { parseJsonLoose } from './json.js';
+export { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector.js';
 
 // 规整方向
 function normalizeDirection(value: unknown): string {

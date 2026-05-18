@@ -1,6 +1,6 @@
-import { sleep } from '../shared/config';
-import { EX1024_API_BASE, USER_AGENT } from './config';
-import type { FetchImpl, SyncMarketRow } from './types';
+import { sleep } from '../shared/config.js';
+import { EX1024_API_BASE, USER_AGENT } from './config.js';
+import type { FetchImpl, SyncMarketRow } from './types.js';
 
 const E6_SCALE = 1_000_000;
 

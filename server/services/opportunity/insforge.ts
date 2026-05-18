@@ -1,6 +1,6 @@
-import { mapInsforgeMarket } from './market';
-import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge';
-import type { InsforgeClient, ServerEnv, VectorCandidate } from './types';
+import { mapInsforgeMarket } from './market.js';
+import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge.js';
+import type { InsforgeClient, ServerEnv, VectorCandidate } from './types.js';
 
 // 建客户端
 export function createInsforgeClient(env: ServerEnv): InsforgeClient {

@@ -1,9 +1,9 @@
 import {
   EMBEDDING_RETRIES,
   sleep,
-} from './config';
-import { resolveOpenRouterEmbeddingConfig, toVectorLiteral } from '../shared/openrouter';
-import type { EmbeddingOptions, FetchImpl, ServerEnv } from './types';
+} from './config.js';
+import { resolveOpenRouterEmbeddingConfig, toVectorLiteral } from '../shared/openrouter.js';
+import type { EmbeddingOptions, FetchImpl, ServerEnv } from './types.js';
 
 // 解析配置
 export function resolveEmbeddingOptions(env: ServerEnv, expectedDimensions: number): EmbeddingOptions {

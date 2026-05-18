@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { createZeroGProofService } from './service';
-import { assertSignalHash } from './validation';
-import { renderZeroGProofPage } from './page';
-import { ProofHttpError } from './types';
+import { createZeroGProofService } from './service.js';
+import { assertSignalHash } from './validation.js';
+import { renderZeroGProofPage } from './page.js';
+import { ProofHttpError } from './types.js';
 
 interface AppOptions {
   env?: Record<string, string | undefined>;

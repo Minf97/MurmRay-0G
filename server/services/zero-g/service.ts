@@ -1,15 +1,15 @@
-import { canonicalize, hashCanonicalJson } from './canonical';
-import { createZeroGChainClient } from './chain';
-import { createZeroGStorageClient } from './storage';
-import { readProofLimit, readSignalPayload } from './validation';
-import { resolveTrackRecordState } from './ledger';
+import { canonicalize, hashCanonicalJson } from './canonical.js';
+import { createZeroGChainClient } from './chain.js';
+import { createZeroGStorageClient } from './storage.js';
+import { readProofLimit, readSignalPayload } from './validation.js';
+import { resolveTrackRecordState } from './ledger.js';
 import type {
   ChainSignalAnchor,
   CreateZeroGProofServiceOptions,
   PublishSignalRequest,
   SignalPayload,
   SignalProof,
-} from './types';
+} from './types.js';
 
 // 读取根哈希
 function readRootHash(storageUri: string): string {

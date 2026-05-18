@@ -1,12 +1,12 @@
-import { APPLY_CHUNK_SIZE, MARK_CHUNK_SIZE, chunkArray } from './config';
-import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge';
+import { APPLY_CHUNK_SIZE, MARK_CHUNK_SIZE, chunkArray } from './config.js';
+import { createInsforgeClient as createSharedInsforgeClient } from '../shared/insforge.js';
 import type {
   EmbeddingApplyRow,
   EmbeddingInsforgeClient,
   EmbeddingJob,
   FailedEmbeddingJob,
-} from './types';
-import type { ServerEnv } from '../shared/insforge';
+} from './types.js';
+import type { ServerEnv } from '../shared/insforge.js';
 
 // 建客户端
 export function createEmbeddingInsforgeClient(env: ServerEnv): EmbeddingInsforgeClient {
