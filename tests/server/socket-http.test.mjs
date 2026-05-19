@@ -4,6 +4,7 @@ import {
   buildSocketHttpRequest,
   parseRawHttpResponse,
   shouldUseSocketHttp,
+  withSocketTimeout,
 } from '../../server/runtime/socket-http';
 
 const encoder = new TextEncoder();
@@ -45,4 +46,11 @@ test('parseRawHttpResponse reads chunked response bodies', async () => {
 
   assert.equal(response.status, 200);
   assert.equal(await response.text(), 'hello world');
+});
+
+test('withSocketTimeout surfaces stalled socket reads', async () => {
+  await assert.rejects(
+    () => withSocketTimeout(new Promise(() => {}), 'read', 1),
+    /Socket HTTP read timed out\./,
+  );
 });

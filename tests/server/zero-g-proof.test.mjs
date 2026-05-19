@@ -172,10 +172,12 @@ test('createZeroGProofService clamps proof list limit', async () => {
   });
 
   await service.listProofs(999);
-  assert.equal(limits[0], 200);
+  await service.listProofs(undefined);
+  assert.deepEqual(limits, [50, 10]);
 });
 
 test('createZeroGProofService rebuilds proofs from chain anchors and 0G storage', async () => {
+  let outcomeCalls = 0;
   const service = createZeroGProofService({
     storageClient: {
       async saveSignal() { throw new Error('storage should not run'); },
@@ -200,6 +202,12 @@ test('createZeroGProofService rebuilds proofs from chain anchors and 0G storage'
         });
       },
     },
+    outcomeClient: {
+      async resolve() {
+        outcomeCalls += 1;
+        return null;
+      },
+    },
   });
 
   const list = await service.listProofs(10);
@@ -210,6 +218,7 @@ test('createZeroGProofService rebuilds proofs from chain anchors and 0G storage'
   assert.equal(list[0].marketQuestion, 'Will tariffs rise before July?');
   assert.equal(list[0].lifecycleStatus, 'active');
   assert.equal(detail.txHash, '0xchain');
+  assert.equal(outcomeCalls, 0);
 });
 
 test('createZeroGProofService marks expired signals for track record', async () => {
@@ -225,6 +234,9 @@ test('createZeroGProofService marks expired signals for track record', async () 
         return [sampleProof({ blockNumber: 100, logIndex: 0 })];
       },
       async findSignalAnchor() { return null; },
+    },
+    outcomeClient: {
+      async resolve() { return null; },
     },
   });
 
@@ -247,11 +259,80 @@ test('createZeroGProofService marks scored signals as resolved', async () => {
       },
       async findSignalAnchor() { return null; },
     },
+    outcomeClient: {
+      async resolve() { return null; },
+    },
   });
 
   const list = await service.listProofs(10);
   assert.equal(list[0].lifecycleStatus, 'resolved');
   assert.equal(list[0].outcomeStatus, 'hit');
+});
+
+test('createZeroGProofService refreshes expired market from outcome client', async () => {
+  const service = createZeroGProofService({
+    now: () => Date.parse('2026-07-01T00:00:00.000Z'),
+    storageClient: {
+      async saveSignal() { throw new Error('storage should not run'); },
+      async loadSignal() { return sampleStoredSignal(); },
+    },
+    chainClient: {
+      async registerSignalHash() { throw new Error('chain should not run'); },
+      async listSignalAnchors() {
+        return [sampleProof({ blockNumber: 100, logIndex: 0 })];
+      },
+      async findSignalAnchor() { return null; },
+    },
+    outcomeClient: {
+      async resolve() {
+        return {
+          checkedAt: '2026-07-01T00:00:00.000Z',
+          closed: false,
+          winningOutcome: null,
+          outcomeStatus: 'pending',
+          note: 'Market is still open on Polymarket.',
+        };
+      },
+    },
+  });
+
+  const list = await service.listProofs(10);
+  assert.equal(list[0].lifecycleStatus, 'active');
+  assert.equal(list[0].outcomeStatus, 'pending');
+  assert.equal(list[0].trackRecordNote, 'Market is still open on Polymarket.');
+});
+
+test('createZeroGProofService scores closed markets from outcome client', async () => {
+  const service = createZeroGProofService({
+    now: () => Date.parse('2026-07-01T00:00:00.000Z'),
+    storageClient: {
+      async saveSignal() { throw new Error('storage should not run'); },
+      async loadSignal() { return sampleStoredSignal(); },
+    },
+    chainClient: {
+      async registerSignalHash() { throw new Error('chain should not run'); },
+      async listSignalAnchors() {
+        return [sampleProof({ blockNumber: 100, logIndex: 0 })];
+      },
+      async findSignalAnchor() { return null; },
+    },
+    outcomeClient: {
+      async resolve() {
+        return {
+          checkedAt: '2026-07-01T00:00:00.000Z',
+          closed: true,
+          winningOutcome: 'Yes',
+          outcomeStatus: 'hit',
+          note: 'Market resolved to Yes; signal matched.',
+        };
+      },
+    },
+  });
+
+  const list = await service.listProofs(10);
+  assert.equal(list[0].lifecycleStatus, 'resolved');
+  assert.equal(list[0].outcomeStatus, 'hit');
+  assert.equal(list[0].trackRecordNote, 'Market resolved to Yes; signal matched.');
 });
 
 test('createZeroGProofApp exposes health and proof page', async () => {

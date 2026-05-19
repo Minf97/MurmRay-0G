@@ -1,15 +1,19 @@
 import { canonicalize, hashCanonicalJson } from './canonical.js';
 import { createZeroGChainClient } from './chain.js';
 import { createZeroGStorageClient } from './storage.js';
+import { createPolymarketOutcomeClient } from './outcome.js';
 import { readProofLimit, readSignalPayload } from './validation.js';
 import { resolveTrackRecordState } from './ledger.js';
 import type {
   ChainSignalAnchor,
   CreateZeroGProofServiceOptions,
+  MarketOutcomeState,
   PublishSignalRequest,
   SignalPayload,
   SignalProof,
 } from './types.js';
+
+const PROOF_LIST_BATCH_SIZE = 2;
 
 // 读取根哈希
 function readRootHash(storageUri: string): string {
@@ -19,9 +23,21 @@ function readRootHash(storageUri: string): string {
   return rootHash;
 }
 
+// 分批读取
+async function mapAnchorsInBatches(
+  anchors: ChainSignalAnchor[],
+  mapper: (anchor: ChainSignalAnchor) => Promise<SignalProof>,
+): Promise<SignalProof[]> {
+  const proofs: SignalProof[] = [];
+  for (let index = 0; index < anchors.length; index += PROOF_LIST_BATCH_SIZE) {
+    proofs.push(...await Promise.all(anchors.slice(index, index + PROOF_LIST_BATCH_SIZE).map(mapper)));
+  }
+  return proofs;
+}
+
 // 组装证明
-function buildProofFromAnchor(anchor: ChainSignalAnchor, signal: SignalPayload, nowMs: number): SignalProof {
-  const trackRecord = resolveTrackRecordState(signal, nowMs);
+function buildProofFromAnchor(anchor: ChainSignalAnchor, signal: SignalPayload, nowMs: number, outcome?: MarketOutcomeState | null): SignalProof {
+  const trackRecord = resolveTrackRecordState(signal, nowMs, outcome);
   return {
     signalHash: anchor.signalHash,
     storageUri: anchor.storageUri,
@@ -52,6 +68,7 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
   const now = options.now ?? (() => Date.now());
   let storageClient = options.storageClient;
   let chainClient = options.chainClient;
+  let outcomeClient = options.outcomeClient;
 
   // 取存储器
   function getStorageClient() {
@@ -63,6 +80,24 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
   function getChainClient() {
     if (!chainClient) chainClient = createZeroGChainClient(env);
     return chainClient;
+  }
+
+  // 取结果源
+  function getOutcomeClient() {
+    if (!outcomeClient) outcomeClient = createPolymarketOutcomeClient();
+    return outcomeClient;
+  }
+
+  // 读取证明
+  async function buildTrackedProof(anchor: ChainSignalAnchor): Promise<SignalProof> {
+    const nowMs = now();
+    const signal = await getStorageClient().loadSignal(anchor.storageUri);
+    const baseline = resolveTrackRecordState(signal, nowMs);
+    if (baseline.lifecycleStatus === 'active' || baseline.lifecycleStatus === 'resolved') {
+      return buildProofFromAnchor(anchor, signal, nowMs);
+    }
+    const outcome = await getOutcomeClient().resolve(signal, nowMs);
+    return buildProofFromAnchor(anchor, signal, nowMs, outcome);
   }
 
   // 发布信号
@@ -101,16 +136,14 @@ export function createZeroGProofService(options: CreateZeroGProofServiceOptions 
   // 列出证明
   async function listProofs(limitInput: unknown): Promise<SignalProof[]> {
     const anchors = await getChainClient().listSignalAnchors(readProofLimit(limitInput));
-    return Promise.all(anchors.map(async (anchor) => (
-      buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri), now())
-    )));
+    return mapAnchorsInBatches(anchors, buildTrackedProof);
   }
 
   // 查找证明
   async function findProof(signalHash: string): Promise<SignalProof | null> {
     const anchor = await getChainClient().findSignalAnchor(signalHash);
     if (!anchor) return null;
-    return buildProofFromAnchor(anchor, await getStorageClient().loadSignal(anchor.storageUri), now());
+    return buildTrackedProof(anchor);
   }
 
   return {

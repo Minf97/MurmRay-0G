@@ -86,7 +86,7 @@ function readOptionalDate(value: unknown, label: string): string | null {
 
 // 限制数量
 export function readProofLimit(value: unknown): number {
-  return clampInt(value, 50, 1, 200);
+  return clampInt(value, 10, 1, 50);
 }
 
 // 读取信号

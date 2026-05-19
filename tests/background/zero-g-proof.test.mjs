@@ -83,6 +83,36 @@ test('publishZeroGProofsForAnalysis posts proofs with service key', async () => 
   assert.equal(state.proofPageUrl, 'https://proof.example.com/0g-proof');
 });
 
+test('publishZeroGProofsForAnalysis binds service worker fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  const proof = {
+    signalHash: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    storageUri: '0g://root',
+    txHash: '0xchain',
+  };
+
+  globalThis.fetch = function () {
+    assert.equal(this, globalThis);
+    return Promise.resolve(new Response(JSON.stringify({ proof }), {
+      status: 201,
+      headers: { 'content-type': 'application/json' },
+    }));
+  };
+
+  try {
+    const state = await publishZeroGProofsForAnalysis(SAMPLE_PAGE, sampleResult(), {
+      baseUrl: 'https://proof.example.com',
+      apiKey: 'proof-key',
+      now: () => Date.parse('2026-05-17T00:00:00.000Z'),
+    });
+
+    assert.equal(state.status, 'ready');
+    assert.equal(state.proofs[0].txHash, '0xchain');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publishZeroGProofsForAnalysis surfaces missing publish config', async () => {
   const state = await publishZeroGProofsForAnalysis(SAMPLE_PAGE, sampleResult(), {
     baseUrl: 'https://proof.example.com',

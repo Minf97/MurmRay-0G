@@ -22,6 +22,7 @@ import {
 import { fetch1024ActiveMarkets, fetch1024MarketsPage, map1024Market } from './ex1024.js';
 import { fetchGammaEventsPage, fetchGammaMarketsPage, mapGammaMarket } from './gamma.js';
 import { persistMarketChanges } from './rows.js';
+import { readRuntimeFetch } from '../../runtime/fetch.js';
 import type { CreateSyncServiceOptions, SyncInsforgeClient, SyncMarketRow, SyncRequest } from './types.js';
 
 // 时间戳毫秒
@@ -48,7 +49,7 @@ function subtractSeconds(iso: string, seconds: number): string {
 // 创建服务
 export function createSyncService(options: CreateSyncServiceOptions = {}) {
   const env = options.env ?? process.env;
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? readRuntimeFetch();
   const now = options.now ?? (() => Date.now());
   const sleepImpl = options.sleepImpl ?? sleep;
 

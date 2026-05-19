@@ -24,6 +24,7 @@ interface SocketFetchInit {
 
 const HEADER_END = new Uint8Array([13, 10, 13, 10]);
 const LINE_END = new Uint8Array([13, 10]);
+const SOCKET_HTTP_TIMEOUT_MS = 12_000;
 let socketConnectPromise: Promise<SocketConnect> | null = null;
 
 // 预览响应
@@ -132,6 +133,26 @@ async function readSocketConnect(): Promise<SocketConnect> {
   return socketConnectPromise;
 }
 
+// 等待超时
+export async function withSocketTimeout<T>(
+  promise: Promise<T>,
+  label: string,
+  timeoutMs = SOCKET_HTTP_TIMEOUT_MS,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Socket HTTP ${label} timed out.`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 // 判断直连
 export function shouldUseSocketHttp(rawUrl: string): boolean {
   const url = new URL(rawUrl);
@@ -172,12 +193,12 @@ export async function fetchSocketHttp(rawUrl: string, init: SocketFetchInit): Pr
   const chunks: Uint8Array[] = [];
 
   try {
-    await socket.opened;
-    await writer.write(await buildSocketHttpRequest(rawUrl, init));
+    await withSocketTimeout(Promise.resolve(socket.opened), 'open');
+    await withSocketTimeout(writer.write(await buildSocketHttpRequest(rawUrl, init)), 'write');
     writer.releaseLock();
 
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await withSocketTimeout(reader.read(), 'read');
       if (done) break;
       if (value) chunks.push(value);
     }

@@ -9,12 +9,20 @@ interface ZeroGStorageConfig {
   privateKey: string | null;
 }
 
+type RpcClient = {
+  retry: number;
+  timeout: number;
+};
+
 type UploadResult = {
   txHash?: string;
   rootHash?: string;
   txHashes?: string[];
   rootHashes?: string[];
 };
+
+const STORAGE_DOWNLOAD_TIMEOUT_MS = 8_000;
+const STORAGE_DOWNLOAD_RETRY_COUNT = 1;
 
 // 读取配置
 function readStorageConfig(env: ServerEnv): ZeroGStorageConfig {
@@ -52,6 +60,12 @@ function readRootHash(storageUri: string): string {
   return rootHash;
 }
 
+// 缩短超时
+function tuneStorageRpc(client: RpcClient): void {
+  client.timeout = STORAGE_DOWNLOAD_TIMEOUT_MS;
+  client.retry = STORAGE_DOWNLOAD_RETRY_COUNT;
+}
+
 // 创建客户端
 export function createZeroGStorageClient(env: ServerEnv): ZeroGStorageClient {
   const config = readStorageConfig(env);
@@ -77,8 +91,24 @@ export function createZeroGStorageClient(env: ServerEnv): ZeroGStorageClient {
       return readUploadResult(result, rootHash);
     },
     async loadSignal(storageUri: string): Promise<SignalPayload> {
-      const { Indexer } = await import('@0gfoundation/0g-storage-ts-sdk');
-      const [blob, downloadError] = await new Indexer(config.indexerRpc).downloadToBlob(readRootHash(storageUri));
+      const { Downloader, Indexer, StorageNode, selectNodes } = await import('@0gfoundation/0g-storage-ts-sdk');
+      const rootHash = readRootHash(storageUri);
+      const indexer = new Indexer(config.indexerRpc);
+      tuneStorageRpc(indexer);
+
+      const locations = await indexer.getFileLocations(rootHash);
+      if (!locations.length) throw new Error(`0G Storage file has no locations: ${rootHash}`);
+
+      const [selected, ok] = selectNodes(locations, 1, 'random');
+      if (!ok) throw new Error(`0G Storage file has no complete shard set: ${rootHash}`);
+
+      const nodes = selected.map((node) => {
+        const client = new StorageNode(node.url);
+        tuneStorageRpc(client);
+        return client;
+      });
+
+      const [blob, downloadError] = await new Downloader(nodes).downloadToBlob(rootHash);
       if (downloadError) throw downloadError;
 
       const payload = JSON.parse(await blob.text());

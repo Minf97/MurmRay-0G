@@ -107,10 +107,11 @@ export function renderZeroGProofPage(): string {
     </section>
   </main>
   <script>
-    const statusEl = document.getElementById('status');
-    const summaryEl = document.getElementById('summary');
-    const tableRoot = document.getElementById('tableRoot');
-    const refreshButton = document.getElementById('refresh');
+	    const statusEl = document.getElementById('status');
+	    const summaryEl = document.getElementById('summary');
+	    const tableRoot = document.getElementById('tableRoot');
+	    const refreshButton = document.getElementById('refresh');
+	    const DEFAULT_PROOF_LIST_LIMIT = 5;
 
     function esc(value) {
       return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -139,7 +140,7 @@ export function renderZeroGProofPage(): string {
       ].join('');
     }
 
-    function renderTable(proofs) {
+	    function renderTable(proofs) {
       if (!proofs.length) {
         tableRoot.innerHTML = '<div class="empty">No signals recorded yet.</div>';
         return;
@@ -155,16 +156,34 @@ export function renderZeroGProofPage(): string {
         '</tr>';
       }).join('');
 
-      tableRoot.innerHTML = '<table><thead><tr><th>Status</th><th>Market judgment</th><th>0G Storage</th><th>0G Chain</th><th>Timeline</th></tr></thead><tbody>' + rows + '</tbody></table>';
-    }
+	      tableRoot.innerHTML = '<table><thead><tr><th>Status</th><th>Market judgment</th><th>0G Storage</th><th>0G Chain</th><th>Timeline</th></tr></thead><tbody>' + rows + '</tbody></table>';
+	    }
 
-    async function loadProofs() {
-      statusEl.textContent = 'Refreshing…';
-      const response = await fetch('/api/0g/proofs?limit=50');
-      if (!response.ok) throw new Error('Failed to load proofs.');
-      const payload = await response.json();
-      const proofs = Array.isArray(payload.proofs) ? payload.proofs : [];
-      renderSummary(proofs);
+	    async function readPayload(response) {
+	      const text = await response.text();
+	      if (!text) return {};
+	      if ((response.headers.get('content-type') || '').includes('application/json')) return JSON.parse(text);
+	      return { error: text.slice(0, 500) };
+	    }
+
+	    function readErrorMessage(payload) {
+	      if (payload && typeof payload === 'object' && payload.error) return String(payload.error);
+	      return 'Failed to load proofs.';
+	    }
+
+	    function readListLimit() {
+	      const value = Number(new URLSearchParams(location.search).get('limit') || DEFAULT_PROOF_LIST_LIMIT);
+	      if (!Number.isFinite(value)) return DEFAULT_PROOF_LIST_LIMIT;
+	      return Math.min(50, Math.max(1, Math.round(value)));
+	    }
+	
+	    async function loadProofs() {
+	      statusEl.textContent = 'Refreshing…';
+	      const response = await fetch('/api/0g/proofs?limit=' + readListLimit());
+	      const payload = await readPayload(response);
+	      if (!response.ok) throw new Error(readErrorMessage(payload));
+	      const proofs = Array.isArray(payload.proofs) ? payload.proofs : [];
+	      renderSummary(proofs);
       renderTable(proofs);
       statusEl.textContent = 'Ready';
     }

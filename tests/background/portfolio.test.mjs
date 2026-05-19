@@ -65,6 +65,30 @@ test('portfolio controller reads profile and positions for manual address', asyn
   assert.equal(urls.some((url) => url.includes(`user=${PROXY}`)), true);
 });
 
+test('portfolio controller binds service worker fetch', async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  globalThis.fetch = function (url) {
+    assert.equal(this, globalThis);
+    fetchCalls += 1;
+    if (String(url).includes('/public-profile')) return Promise.resolve(jsonResponse(null));
+    return Promise.resolve(jsonResponse([]));
+  };
+
+  try {
+    const controller = createPolymarketPortfolioController({
+      getWalletState: async () => ({ account: ADDRESS }),
+    });
+
+    const snapshot = await controller.getPolymarketPortfolio({ force: true });
+    assert.equal(snapshot.source, 'auto');
+    assert.equal(fetchCalls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('portfolio controller caches snapshots by address', async () => {
   let fetchCalls = 0;
   let now = 1000;

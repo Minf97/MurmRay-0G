@@ -7,6 +7,7 @@ import {
   normalizePortfolioPosition,
   type PortfolioSnapshot,
 } from '../shared/portfolio';
+import { readRuntimeFetch } from '../shared/runtime-fetch';
 
 const PROFILE_API_BASE_URL = 'https://profile-api.polymarket.com';
 const DATA_API_BASE_URL = 'https://data-api.polymarket.com';
@@ -45,7 +46,7 @@ function getErrorMessage(error: unknown) {
 export function createPolymarketPortfolioController(options: PortfolioControllerOptions) {
   const {
     getWalletState,
-    fetchImpl = fetch,
+    fetchImpl = readRuntimeFetch(),
     now = () => Date.now(),
   } = options;
   const portfolioCache = new Map<string, CachedPortfolio>();

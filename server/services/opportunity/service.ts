@@ -11,6 +11,7 @@ import { buildPolymarketUrl } from './market.js';
 import { requestEmbeddings, requestMarketMatches, resolveOpenRouterConfig, summarizePage } from './openrouter.js';
 import { buildQueryTexts, cosineSimilarity, pickTopMarkets } from './vector.js';
 import { publishZeroGProofs } from './zero-g-proof.js';
+import { readRuntimeFetch } from '../../runtime/fetch.js';
 import type { AnalysisRequest, CreateAnalysisServiceOptions, Market, MatchResult, PageContext } from './types.js';
 
 export { mergeCandidateLists } from './insforge.js';
@@ -90,7 +91,7 @@ function mapAiMatches(rawMatches: Record<string, unknown>[], markets: Market[]):
 
 // 创建服务
 export function createAnalysisService(options: CreateAnalysisServiceOptions = {}) {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? readRuntimeFetch();
   const env = options.env ?? process.env;
   const now = options.now ?? (() => Date.now());
   const embedBatchSize = clampInt(options.embedBatchSize, DEFAULT_EMBED_BATCH_SIZE, 1, 200);

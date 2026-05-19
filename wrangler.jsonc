@@ -11,6 +11,7 @@
   },
   "vars": {
     "OPENROUTER_HTTP_REFERER": "https://murmray.app",
-    "OPENROUTER_APP_TITLE": "MurmRay"
+    "OPENROUTER_APP_TITLE": "MurmRay",
+    "ZERO_G_PROOF_API_BASE_URL": "https://murmray-backend.287728237.workers.dev"
   }
 }

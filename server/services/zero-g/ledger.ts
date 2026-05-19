@@ -1,4 +1,4 @@
-import type { SignalLifecycleStatus, SignalOutcomeStatus, SignalPayload } from './types.js';
+import type { MarketOutcomeState, SignalLifecycleStatus, SignalOutcomeStatus, SignalPayload } from './types.js';
 
 export interface TrackRecordState {
   lifecycleStatus: SignalLifecycleStatus;
@@ -14,13 +14,29 @@ function readOutcomeStatus(metadata: Record<string, unknown>): SignalOutcomeStat
 }
 
 // 判断状态
-export function resolveTrackRecordState(signal: SignalPayload, nowMs: number): TrackRecordState {
+export function resolveTrackRecordState(signal: SignalPayload, nowMs: number, outcome?: MarketOutcomeState | null): TrackRecordState {
+  if (outcome?.outcomeStatus === 'hit' || outcome?.outcomeStatus === 'miss') {
+    return {
+      lifecycleStatus: 'resolved',
+      outcomeStatus: outcome.outcomeStatus,
+      trackRecordNote: outcome.note,
+    };
+  }
+
   const outcomeStatus = readOutcomeStatus(signal.metadata);
   if (outcomeStatus === 'hit' || outcomeStatus === 'miss') {
     return {
       lifecycleStatus: 'resolved',
       outcomeStatus,
       trackRecordNote: outcomeStatus === 'hit' ? 'Market result matched the signal.' : 'Market result missed the signal.',
+    };
+  }
+
+  if (outcome && !outcome.closed) {
+    return {
+      lifecycleStatus: 'active',
+      outcomeStatus: 'pending',
+      trackRecordNote: outcome.note,
     };
   }
 
@@ -52,6 +68,6 @@ export function resolveTrackRecordState(signal: SignalPayload, nowMs: number): T
   return {
     lifecycleStatus: 'expired',
     outcomeStatus: 'unknown',
-    trackRecordNote: 'Market window has passed; outcome scoring is not connected yet.',
+    trackRecordNote: outcome?.note || 'Market window has passed; outcome is not available yet.',
   };
 }

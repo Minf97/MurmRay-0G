@@ -88,6 +88,18 @@ export interface SignalProof extends StorageProof, ChainProof {
   createdAt: string;
 }
 
+export interface MarketOutcomeState {
+  checkedAt: string;
+  closed: boolean;
+  winningOutcome: string | null;
+  outcomeStatus: SignalOutcomeStatus;
+  note: string;
+}
+
+export interface ZeroGMarketOutcomeClient {
+  resolve(signal: SignalPayload, nowMs: number): Promise<MarketOutcomeState | null>;
+}
+
 export interface ZeroGStorageClient {
   saveSignal(input: StorageSaveInput): Promise<StorageProof>;
   loadSignal(storageUri: string): Promise<SignalPayload>;
@@ -104,6 +116,7 @@ export interface CreateZeroGProofServiceOptions {
   now?: () => number;
   storageClient?: ZeroGStorageClient;
   chainClient?: ZeroGChainClient;
+  outcomeClient?: ZeroGMarketOutcomeClient;
 }
 
 export class ProofHttpError extends Error {

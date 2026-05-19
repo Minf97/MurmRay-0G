@@ -18,6 +18,7 @@ import {
   markJobsFailed,
 } from './insforge.js';
 import { callEmbeddingSingle, resolveEmbeddingOptions, toVectorLiteral } from './openrouter.js';
+import { readRuntimeFetch } from '../../runtime/fetch.js';
 import type {
   CreateEmbeddingWorkerOptions,
   EmbeddingApplyRow,
@@ -79,7 +80,7 @@ function buildSucceededRow(job: EmbeddingJob, vector: number[], syncedAt: string
 // 创建服务
 export function createEmbeddingWorker(options: CreateEmbeddingWorkerOptions = {}) {
   const env = options.env ?? process.env;
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = options.fetchImpl ?? readRuntimeFetch();
   const now = options.now ?? (() => Date.now());
   const sleepImpl = options.sleepImpl;
 

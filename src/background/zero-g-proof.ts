@@ -2,6 +2,7 @@ import {
   ZERO_G_PROOF_API_BASE_URL,
   ZERO_G_PROOF_API_KEY,
 } from '../shared/config';
+import { readRuntimeFetch } from '../shared/runtime-fetch';
 import {
   clipText,
   type AnalysisMatch,
@@ -132,7 +133,7 @@ export async function publishZeroGProofsForAnalysis(
 ): Promise<ZeroGPublishState> {
   const baseUrl = (options.baseUrl || ZERO_G_PROOF_API_BASE_URL).trim();
   const apiKey = (options.apiKey || ZERO_G_PROOF_API_KEY).trim();
-  const fetchImpl = options.fetchImpl || fetch;
+  const fetchImpl = options.fetchImpl || readRuntimeFetch();
   const proofPageUrl = buildZeroGProofPageUrl(baseUrl);
 
   if (result.zeroGProofs?.length) {

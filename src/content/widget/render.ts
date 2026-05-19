@@ -1,17 +1,30 @@
 import { buildWidgetView, type WidgetState, type WidgetView } from '../widget-model';
 import type { WidgetElements } from './dom';
 
-// 转义文本
-function escapeHtml(text: unknown) {
-  const div = document.createElement('div');
-  div.textContent = String(text ?? '');
-  return div.innerHTML;
-}
-
 // 设置模式
 function setWidgetMode(elements: WidgetElements, mode: WidgetView['mode'], subState?: string) {
   elements.wrap.dataset.mode = mode;
   if (subState) elements.wrap.dataset.state = subState;
+}
+
+// 创建文本
+function createTextSpan(className: string, value: unknown) {
+  const span = document.createElement('span');
+  span.className = className;
+  span.textContent = String(value ?? '');
+  return span;
+}
+
+// 创建行
+function createCardRow(row: Extract<WidgetView, { mode: 'card' }>['rows'][number]) {
+  const item = document.createElement('li');
+  item.className = 'ghost-card-row';
+  item.dataset.tier = String(row.tier || '');
+  item.append(
+    createTextSpan('row-text', row.question),
+    createTextSpan('row-score', row.confidence),
+  );
+  return item;
 }
 
 // 渲染圆盘
@@ -34,12 +47,7 @@ function renderCard(elements: WidgetElements, view: Extract<WidgetView, { mode: 
   if (titleEl) titleEl.textContent = view.title;
   if (scopeEl) scopeEl.textContent = view.scope;
   if (listEl) {
-    listEl.innerHTML = view.rows.map((row) => `
-      <li class="ghost-card-row" data-tier="${escapeHtml(row.tier)}">
-        <span class="row-text">${escapeHtml(row.question)}</span>
-        <span class="row-score">${escapeHtml(row.confidence)}</span>
-      </li>
-    `).join('');
+    listEl.replaceChildren(...view.rows.map(createCardRow));
   }
 
   elements.card.setAttribute('aria-label', view.ariaLabel);

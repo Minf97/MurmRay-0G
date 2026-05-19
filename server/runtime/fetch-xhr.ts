@@ -1,6 +1,7 @@
 type XhrHandler = ((event: Event) => void) | null;
 
 import { fetchSocketHttp, shouldUseSocketHttp } from './socket-http.js';
+import { readRuntimeFetch } from './fetch.js';
 
 interface FetchXhrGlobal {
   XMLHttpRequest?: typeof XMLHttpRequest;
@@ -26,7 +27,7 @@ async function readResponse(response: Response, responseType: XMLHttpRequestResp
 // 发送请求
 function requestWithRuntimeFetch(url: string, init: RequestInit): Promise<Response> {
   if (shouldUseSocketHttp(url)) return fetchSocketHttp(url, init);
-  return fetch(url, init);
+  return readRuntimeFetch()(url, init);
 }
 
 // Fetch 适配
